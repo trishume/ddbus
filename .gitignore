@@ -3,4 +3,5 @@ docs.json
 __dummy.html
 *.o
 *.obj
-ddbus
+/ddbus
+__test__library__

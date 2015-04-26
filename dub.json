@@ -7,5 +7,6 @@
   "authors": ["Tristan Hume"],
     "lflags": ["-ldbus-1"],
 	"dependencies": {
+      "dunit": "~>1.0.10"
 	}
 }
