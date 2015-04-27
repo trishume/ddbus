@@ -12,12 +12,19 @@ template allCanDBus(TS...) {
   }
 }
 
-template canDBus(T) {
+template basicDBus(T) {
   static if(is(T == byte) || is(T == short) || is (T == ushort) || is (T == int)
             || is (T == uint) || is (T == long) || is (T == ulong)
             || is (T == double) || is (T == string) || is(T == bool)) {
+    enum basicDBus = true;
+  } else {
+    enum basicDBus = false;
+  }
+}
+
+template canDBus(T) {
+  static if(basicDBus!T) {
     enum canDBus = true;
-    
   } else static if(isTuple!T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
@@ -77,6 +84,11 @@ string typeSigAll(TS...)() if(allCanDBus!TS) {
   return sig;
 }
 
+int typeCode(T)() if(canDBus!T) {
+  string sig = typeSig!T();
+  return sig[0];
+}
+
 unittest {
   import dunit.toolkit;
   // basics
@@ -91,6 +103,9 @@ unittest {
   typeSig!(Tuple!(byte)[][]).assertEqual("aa(y)");
   // multiple arguments
   typeSigAll!(int,bool).assertEqual("ib");
+  // type codes
+  typeCode!int().assertEqual(cast(int)('i'));
+  typeCode!bool().assertEqual(cast(int)('b'));
   // ctfe-capable
   static string sig = typeSig!ulong();
   sig.assertEqual("t");
