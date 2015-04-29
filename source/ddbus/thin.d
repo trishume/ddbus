@@ -54,6 +54,7 @@ class Message {
     dbus_message_iter_init(msg, &iter);
     return readIter!T(&iter);
   }
+  alias read to;
 
   Tup readTuple(Tup)() if(isTuple!Tup && allCanDBus!(Tup.Types)) {
     DBusMessageIter iter;
