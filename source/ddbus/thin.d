@@ -6,9 +6,31 @@ import ddbus.util;
 import std.string;
 import std.typecons;
 
+class DBusException : Exception {
+  this(DBusError *err) {
+    super(err.message.fromStringz().idup);
+  }
+}
+
+T wrapErrors(T)(T delegate(DBusError *err) del) {
+  DBusError error;
+  dbus_error_init(&error);
+  T ret = del(&error);
+  if(dbus_error_is_set(&error)) {
+    auto ex = new DBusException(&error);
+    dbus_error_free(&error);
+    throw ex;
+  }
+  return ret;
+}
+
 class Message {
   this(string dest, string path, string iface, string method) {
     msg = dbus_message_new_method_call(dest.toStringz(), path.toStringz(), iface.toStringz(), method.toStringz());
+  }
+
+  this(DBusMessage *m) {
+    msg = m;
   }
 
   ~this() {
@@ -21,6 +43,12 @@ class Message {
     buildIter(&iter, args);
   }
 
+  /**
+     Reads the first argument of the message.
+     Note that this creates a new iterator every time so calling it multiple times will always
+     read the first argument. This is suitable for single item returns.
+     To read multiple arguments use readTuple.
+  */
   T read(T)() if(canDBus!T) {
     DBusMessageIter iter;
     dbus_message_iter_init(msg, &iter);
@@ -43,16 +71,41 @@ class Message {
   DBusMessage *msg;
 }
 
-// class MessageBuilder {
-//   DBusMessageIter iter;
-//   // kept around for GC reasons, iterators need parent message.
-//   Message parent;
-//   this(Message msg) {
-//     parent = msg;
-//     dbus_message_iter_init(parent.msg, &iter);
-//   }
+class Connection {
+  DBusConnection *conn;
+  this(DBusConnection *connection) {
+    conn = connection;
+  }
 
-//   void doBasic(int type, void *v) {
-//     dbus_message_iter_append_basic(&iter, type, v);
-//   }
-// }
+  void sendBlocking(Message msg) {
+    dbus_connection_send(conn,msg.msg,null);
+    dbus_connection_flush(conn);
+  }
+
+  Message sendWithReplyBlocking(Message msg, int timeout = 100) {
+    DBusMessage *reply = wrapErrors((err) {
+        return dbus_connection_send_with_reply_and_block(conn,msg.msg,timeout,err);
+      });
+    return new Message(reply);
+  }
+
+  ~this() {
+    dbus_connection_unref(conn);
+  }
+}
+
+Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
+  DBusConnection *conn = wrapErrors((err) { return dbus_bus_get(bus,err); });
+  return new Connection(conn);
+}
+
+unittest {
+  import dunit.toolkit;
+  // This test will only pass if DBus is installed.
+  Connection conn = connectToBus();
+  conn.conn.assertTruthy();
+  // We can only count on no system bus on OSX
+  version(OSX) {
+    connectToBus(DBusBusType.DBUS_BUS_SYSTEM).assertThrow!DBusException();
+  }
+}
