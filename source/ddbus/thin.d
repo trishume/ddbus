@@ -5,6 +5,7 @@ import ddbus.conv;
 import ddbus.util;
 import std.string;
 import std.typecons;
+import std.exception;
 
 class DBusException : Exception {
   this(DBusError *err) {
@@ -22,6 +23,11 @@ T wrapErrors(T)(T delegate(DBusError *err) del) {
     throw ex;
   }
   return ret;
+}
+
+enum MessageType {
+  Invalid = 0,
+  Call, Return, Error, Signal
 }
 
 class Message {
@@ -64,12 +70,53 @@ class Message {
     return ret;
   }
 
-  const(char)[] signature() {
-    const(char)* cSig = dbus_message_get_signature(msg);
-    return fromStringz(cSig);
+  Message createReturn() {
+    return new Message(dbus_message_new_method_return(msg));
+  }
+
+  MessageType type() {
+    return cast(MessageType)dbus_message_get_type(msg);
+  }
+
+  bool isCall() {
+    return type() == MessageType.Call;
+  }
+
+  // Various string members
+  // TODO: make a mixin to avoid this copy-paste
+  string signature() {
+    const(char)* cStr = dbus_message_get_signature(msg);
+    assert(cStr != null);
+    return cStr.fromStringz().assumeUnique();
+  }
+  string path() {
+    const(char)* cStr = dbus_message_get_path(msg);
+    assert(cStr != null);
+    return cStr.fromStringz().assumeUnique();
+  }
+  string iface() {
+    const(char)* cStr = dbus_message_get_interface(msg);
+    assert(cStr != null);
+    return cStr.fromStringz().assumeUnique();
+  }
+  string member() {
+    const(char)* cStr = dbus_message_get_member(msg);
+    assert(cStr != null);
+    return cStr.fromStringz().assumeUnique();
+  }
+  string sender() {
+    const(char)* cStr = dbus_message_get_sender(msg);
+    assert(cStr != null);
+    return cStr.fromStringz().assumeUnique();
   }
 
   DBusMessage *msg;
+}
+
+unittest {
+  import dunit.toolkit;
+  auto msg = new Message("org.example.test", "/test","org.example.testing","testMethod");
+  msg.path().assertEqual("/test");
 }
 
 class Connection {
@@ -78,8 +125,12 @@ class Connection {
     conn = connection;
   }
 
+  void send(Message msg) {
+    dbus_connection_send(conn,msg.msg, null);
+  }
+
   void sendBlocking(Message msg) {
-    dbus_connection_send(conn,msg.msg,null);
+    send(msg);
     dbus_connection_flush(conn);
   }
 

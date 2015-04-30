@@ -64,6 +64,8 @@ string typeSig(T)() if(canDBus!T) {
     return "d";
   } else static if(is(T == string)) {
     return "s";
+  } else static if(is(T == void)) {
+    return "";
   } else static if(isTuple!T) {
     string sig = "(";
     foreach(i, S; T.Types) {
