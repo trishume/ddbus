@@ -1,3 +1,4 @@
+/// Thin OO wrapper around DBus types
 module ddbus.thin;
 
 import ddbus.c_lib;
@@ -30,13 +31,19 @@ enum MessageType {
   Call, Return, Error, Signal
 }
 
-class Message {
+struct Message {
+  DBusMessage *msg;
+
   this(string dest, string path, string iface, string method) {
     msg = dbus_message_new_method_call(dest.toStringz(), path.toStringz(), iface.toStringz(), method.toStringz());
   }
 
   this(DBusMessage *m) {
     msg = m;
+  }
+
+  this(this) {
+    dbus_message_ref(msg);
   }
 
   ~this() {
@@ -71,7 +78,7 @@ class Message {
   }
 
   Message createReturn() {
-    return new Message(dbus_message_new_method_return(msg));
+    return Message(dbus_message_new_method_return(msg));
   }
 
   MessageType type() {
@@ -109,20 +116,30 @@ class Message {
     assert(cStr != null);
     return cStr.fromStringz().assumeUnique();
   }
-
-  DBusMessage *msg;
 }
 
 unittest {
   import dunit.toolkit;
-  auto msg = new Message("org.example.test", "/test","org.example.testing","testMethod");
+  auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
   msg.path().assertEqual("/test");
 }
 
-class Connection {
+struct Connection {
   DBusConnection *conn;
   this(DBusConnection *connection) {
     conn = connection;
+  }
+
+  this(this) {
+    dbus_connection_ref(conn);
+  }
+
+  ~this() {
+    dbus_connection_unref(conn);
+  }
+
+  void close() {
+    dbus_connection_close(conn);
   }
 
   void send(Message msg) {
@@ -135,20 +152,20 @@ class Connection {
   }
 
   Message sendWithReplyBlocking(Message msg, int timeout = 100) {
+    DBusMessage *dbusMsg = msg.msg;
+    dbus_message_ref(dbusMsg);
     DBusMessage *reply = wrapErrors((err) {
-        return dbus_connection_send_with_reply_and_block(conn,msg.msg,timeout,err);
+        auto ret = dbus_connection_send_with_reply_and_block(conn,dbusMsg,timeout,err);
+        dbus_message_unref(dbusMsg);
+        return ret;
       });
-    return new Message(reply);
-  }
-
-  ~this() {
-    dbus_connection_unref(conn);
+    return Message(reply);
   }
 }
 
 Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
   DBusConnection *conn = wrapErrors((err) { return dbus_bus_get(bus,err); });
-  return new Connection(conn);
+  return Connection(conn);
 }
 
 unittest {

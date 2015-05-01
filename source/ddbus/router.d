@@ -72,8 +72,8 @@ class MessageRouter {
 
 unittest {
   import dunit.toolkit;
-  auto msg = new Message("org.example.test", "/test","org.example.testing","testMethod");
-  auto patt= new MessagePattern(msg);
+  auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
+  auto patt= MessagePattern(msg);
   patt.assertEqual(patt);
   patt.sender.assertNull();
   patt.path.assertEqual("/test");

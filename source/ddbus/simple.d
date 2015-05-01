@@ -14,14 +14,14 @@ class PathIface {
   }
 
   Ret call(Ret, Args...)(string meth, Args args) if(allCanDBus!Args && canDBus!Ret) {
-    Message msg = new Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
+    Message msg = Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
     msg.build(args);
     Message ret = conn.sendWithReplyBlocking(msg);
     return ret.read!Ret();
   }
 
   Message opDispatch(string meth, Args...)(Args args) {
-    Message msg = new Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
+    Message msg = Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
     msg.build(args);
     return conn.sendWithReplyBlocking(msg);
   }

@@ -76,7 +76,7 @@ void readIterTuple(Tup)(DBusMessageIter *iter, ref Tup tuple) if(isTuple!Tup && 
 unittest {
   import dunit.toolkit;
   import ddbus.thin;
-  Message msg = new Message("org.example.wow","/wut","org.test.iface","meth");
+  Message msg = Message("org.example.wow","/wut","org.test.iface","meth");
   bool[] emptyB;
   auto args = tuple(5,true,"wow",[6,5],tuple(6.2,4,[["lol"]],emptyB));
   msg.build(args.expand);
