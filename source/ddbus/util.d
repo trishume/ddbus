@@ -86,6 +86,14 @@ string typeSigAll(TS...)() if(allCanDBus!TS) {
   return sig;
 }
 
+string[] typeSigArr(TS...)() if(allCanDBus!TS) {
+  string[] sig = [];
+  foreach(i,T; TS) {
+    sig ~= typeSig!T();
+  }
+  return sig;
+}
+
 int typeCode(T)() if(canDBus!T) {
   string sig = typeSig!T();
   return sig[0];

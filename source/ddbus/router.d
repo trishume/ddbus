@@ -2,9 +2,12 @@ module ddbus.router;
 
 import ddbus.thin;
 import ddbus.c_lib;
+import ddbus.util;
 import std.string;
 import std.typecons;
 import core.memory;
+import std.array;
+import std.algorithm;
 
 struct MessagePattern {
   string path;
@@ -41,9 +44,15 @@ struct MessagePattern {
   }
 }
 
-class MessageRouter {
+struct MessageHandler {
   alias HandlerFunc = void delegate(Message call, Connection conn);
-  HandlerFunc[MessagePattern] callTable;
+  HandlerFunc func;
+  string[] argSig;
+  string[] retSig;
+}
+
+class MessageRouter {
+  MessageHandler[MessagePattern] callTable;
 
   bool handle(Message msg, Connection conn) {
     MessageType type = msg.type();
@@ -51,9 +60,19 @@ class MessageRouter {
       return false;
     auto pattern = MessagePattern(msg);
     // import std.stdio; debug writeln("Handling ", pattern);
-    HandlerFunc* handler = (pattern in callTable);
+    MessageHandler* handler = (pattern in callTable);
     if(handler is null) return false;
-    (*handler)(msg,conn);
+
+    // Check for matching argument types
+    version(DDBusNoChecking) {
+      
+    } else {
+      if(!equal(join(handler.argSig), msg.signature())) {
+        return false;
+      }
+    }
+
+    handler.func(msg,conn);
     return true;
   }
 
@@ -70,7 +89,14 @@ class MessageRouter {
       if(!patt.signal)
         conn.send(retMsg);
     }
-    callTable[patt] = &handlerWrapper;
+    static string[] args = typeSigArr!Args;
+    static if(is(Ret==void)) {
+      static string[] ret = [];
+    } else {
+      static string[] ret = [typeSig!Ret];
+    }
+    MessageHandler handleStruct = {func: &handlerWrapper, argSig: args, retSig: ret};
+    callTable[patt] = handleStruct;
   }
 }
 
