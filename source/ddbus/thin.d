@@ -94,27 +94,27 @@ struct Message {
   string signature() {
     const(char)* cStr = dbus_message_get_signature(msg);
     assert(cStr != null);
-    return cStr.fromStringz().assumeUnique();
+    return cStr.fromStringz().idup;
   }
   string path() {
     const(char)* cStr = dbus_message_get_path(msg);
     assert(cStr != null);
-    return cStr.fromStringz().assumeUnique();
+    return cStr.fromStringz().idup;
   }
   string iface() {
     const(char)* cStr = dbus_message_get_interface(msg);
     assert(cStr != null);
-    return cStr.fromStringz().assumeUnique();
+    return cStr.fromStringz().idup;
   }
   string member() {
     const(char)* cStr = dbus_message_get_member(msg);
     assert(cStr != null);
-    return cStr.fromStringz().assumeUnique();
+    return cStr.fromStringz().idup;
   }
   string sender() {
     const(char)* cStr = dbus_message_get_sender(msg);
     assert(cStr != null);
-    return cStr.fromStringz().assumeUnique();
+    return cStr.fromStringz().idup;
   }
 }
 
@@ -151,7 +151,7 @@ struct Connection {
     dbus_connection_flush(conn);
   }
 
-  Message sendWithReplyBlocking(Message msg, int timeout = 100) {
+  Message sendWithReplyBlocking(Message msg, int timeout = -1) {
     DBusMessage *dbusMsg = msg.msg;
     dbus_message_ref(dbusMsg);
     DBusMessage *reply = wrapErrors((err) {
