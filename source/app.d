@@ -24,6 +24,10 @@ void testServe(Connection conn) {
       writeln("Called with ", par);
       return par;
     });
+  patt = MessagePattern("/signaler","ca.thume.test","signal",true);
+  router.setHandler!(void,int)(patt,(int par) {
+      writeln("Signalled with ", par);
+    });
   registerRouter(conn, router);
   writeln("Getting name...");
   bool gotem = requestName(conn, "ca.thume.ddbus.test");

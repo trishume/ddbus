@@ -10,38 +10,34 @@ struct MessagePattern {
   string path;
   string iface;
   string method;
-  string sender;
+  bool signal;
 
   this(Message msg) {
     path = msg.path();
     iface = msg.iface();
     method = msg.member();
-    if(msg.type()==MessageType.Signal) {
-      sender = msg.sender();
-    } else {
-      sender = null;
-    }
+    signal = (msg.type() == MessageType.Signal);
   }
 
-  this(string path, string iface, string method, string sender = null) {
+  this(string path, string iface, string method, bool signal = false) {
     this.path = path;
     this.iface = iface;
     this.method = method;
-    this.sender = sender;
+    this.signal = signal;
   }
 
   size_t toHash() const @safe nothrow {
     size_t hash = 0;
     auto stringHash = &(typeid(path).getHash);
-    hash += stringHash(&sender);
     hash += stringHash(&path);
     hash += stringHash(&iface);
     hash += stringHash(&method);
+    hash += (signal?1:0);
     return hash;
   }
 
   bool opEquals(ref const this s) const @safe pure nothrow {
-    return (path == s.path) && (iface == s.iface) && (method == s.method) && (sender == s.sender);
+    return (path == s.path) && (iface == s.iface) && (method == s.method) && (signal == s.signal);
   }
 }
 
@@ -54,6 +50,7 @@ class MessageRouter {
     if(type != MessageType.Call && type != MessageType.Signal)
       return false;
     auto pattern = MessagePattern(msg);
+    // import std.stdio; debug writeln("Handling ", pattern);
     HandlerFunc* handler = (pattern in callTable);
     if(handler is null) return false;
     (*handler)(msg,conn);
@@ -63,12 +60,15 @@ class MessageRouter {
   void setHandler(Ret, Args...)(MessagePattern patt, Ret delegate(Args) handler) {
     void handlerWrapper(Message call, Connection conn) {
       Tuple!Args args = call.readTuple!(Tuple!Args)();
-      Ret ret = handler(args.expand);
       auto retMsg = call.createReturn();
       static if(!is(Ret == void)) {
+        Ret ret = handler(args.expand);
         retMsg.build(ret);
+      } else {
+        handler(args.expand);
       }
-      conn.send(retMsg);
+      if(!patt.signal)
+        conn.send(retMsg);
     }
     callTable[patt] = &handlerWrapper;
   }
@@ -103,6 +103,6 @@ unittest {
   auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
   auto patt= new MessagePattern(msg);
   patt.assertEqual(patt);
-  patt.sender.assertNull();
+  patt.signal.assertFalse();
   patt.path.assertEqual("/test");
 }
