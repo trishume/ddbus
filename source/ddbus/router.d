@@ -8,6 +8,7 @@ import std.typecons;
 import core.memory;
 import std.array;
 import std.algorithm;
+import std.format;
 
 struct MessagePattern {
   string path;
@@ -44,6 +45,15 @@ struct MessagePattern {
   }
 }
 
+unittest {
+  import dunit.toolkit;
+  auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
+  auto patt= new MessagePattern(msg);
+  patt.assertEqual(patt);
+  patt.signal.assertFalse();
+  patt.path.assertEqual("/test");
+}
+
 struct MessageHandler {
   alias HandlerFunc = void delegate(Message call, Connection conn);
   HandlerFunc func;
@@ -60,6 +70,13 @@ class MessageRouter {
       return false;
     auto pattern = MessagePattern(msg);
     // import std.stdio; debug writeln("Handling ", pattern);
+
+    if(pattern.iface == "org.freedesktop.DBus.Introspectable" &&
+      pattern.method == "Introspect" && !pattern.signal) {
+      handleIntrospect(pattern.path, conn);
+      return true;
+    }
+    
     MessageHandler* handler = (pattern in callTable);
     if(handler is null) return false;
 
@@ -98,6 +115,50 @@ class MessageRouter {
     MessageHandler handleStruct = {func: &handlerWrapper, argSig: args, retSig: ret};
     callTable[patt] = handleStruct;
   }
+
+  static string introspectHeader = `
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+    "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="%s">`;
+
+  string introspectXML(string path) {
+    auto methods = callTable.byKey().filter!(a => (a.path == path) && !a.signal)().array()
+      // .schwartzSort!((a) => a.iface, "a<b")();
+      .sort!((a,b) => a.iface < b.iface)().release();
+    auto ifaces = groupBy!((a) => a.iface)(methods);
+    auto app = appender!string;
+    formattedWrite(app,introspectHeader,path);
+    foreach(iface; ifaces) {
+      formattedWrite(app,`<interface name="%s">`,iface.front.iface);
+      foreach(methodPatt; iface) {
+        formattedWrite(app,`<method name="%s">`,methodPatt.method);
+        auto handler = callTable[methodPatt];
+        foreach(arg; handler.argSig) {
+          formattedWrite(app,`<arg type="%s" direction="in"/>`,arg);
+        }
+        foreach(arg; handler.retSig) {
+          formattedWrite(app,`<arg type="%s" direction="out"/>`,arg);
+        }
+        app.put("</method>");
+      }
+      app.put("</interface>");
+    }
+
+    string childPath = path ~ "/";
+    auto children = callTable.byKey().filter!(a => (a.path.startsWith(childPath)) && !a.signal)()
+      .map!((s) => s.path.chompPrefix(childPath))
+      .map!((s) => s.splitter('/').front);
+    foreach(child; children) {
+      formattedWrite(app,`<node name="%s"/>`,child);
+    }
+    
+    app.put("</node>");
+    return app.data;
+  }
+
+  void handleIntrospect(string path, Connection conn) {
+    // TODO
+  }
 }
 
 extern(C) private DBusHandlerResult filterFunc(DBusConnection *dConn, DBusMessage *dMsg, void *routerP) {
@@ -124,11 +185,17 @@ void registerRouter(Connection conn, MessageRouter router) {
   dbus_connection_add_filter(conn.conn, &filterFunc, routerP, &unrootUserData);
 }
 
-unittest {
+unittest{
   import dunit.toolkit;
-  auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
-  auto patt= new MessagePattern(msg);
-  patt.assertEqual(patt);
-  patt.signal.assertFalse();
-  patt.path.assertEqual("/test");
+  auto router = new MessageRouter();
+  // set up test messages
+  MessagePattern patt = MessagePattern("/root","ca.thume.test","test");
+  router.setHandler!(int,int)(patt,(int p) {return 6;});
+  patt = MessagePattern("/root","ca.thume.tester","lolwut");
+  router.setHandler!(void,int,string)(patt,(int p, string p2) {});
+  patt = MessagePattern("/root/wat","ca.thume.tester","lolwut");
+  router.setHandler!(int,int)(patt,(int p) {return 6;});
+
+  // import std.stdio;
+  // writeln(router.introspectXML("/root"));
 }
