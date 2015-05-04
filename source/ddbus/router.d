@@ -73,7 +73,7 @@ class MessageRouter {
 
     if(pattern.iface == "org.freedesktop.DBus.Introspectable" &&
       pattern.method == "Introspect" && !pattern.signal) {
-      handleIntrospect(pattern.path, conn);
+      handleIntrospect(pattern.path, msg, conn);
       return true;
     }
     
@@ -116,9 +116,7 @@ class MessageRouter {
     callTable[patt] = handleStruct;
   }
 
-  static string introspectHeader = `
-<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-    "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+  static string introspectHeader = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="%s">`;
 
   string introspectXML(string path) {
@@ -144,10 +142,14 @@ class MessageRouter {
       app.put("</interface>");
     }
 
-    string childPath = path ~ "/";
+    string childPath = path;
+    if(!childPath.endsWith("/")) {
+      childPath ~= "/";
+    }
     auto children = callTable.byKey().filter!(a => (a.path.startsWith(childPath)) && !a.signal)()
       .map!((s) => s.path.chompPrefix(childPath))
-      .map!((s) => s.splitter('/').front);
+      .map!((s) => s.splitter('/').front)
+      .uniq();
     foreach(child; children) {
       formattedWrite(app,`<node name="%s"/>`,child);
     }
@@ -156,8 +158,10 @@ class MessageRouter {
     return app.data;
   }
 
-  void handleIntrospect(string path, Connection conn) {
-    // TODO
+  void handleIntrospect(string path, Message call, Connection conn) {
+    auto retMsg = call.createReturn();
+    retMsg.build(introspectXML(path));
+    conn.sendBlocking(retMsg);
   }
 }
 
@@ -196,6 +200,8 @@ unittest{
   patt = MessagePattern("/root/wat","ca.thume.tester","lolwut");
   router.setHandler!(int,int)(patt,(int p) {return 6;});
 
-  // import std.stdio;
-  // writeln(router.introspectXML("/root"));
+  static string introspectResult = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="wat"/></node>`;
+  router.introspectXML("/root").assertEqual(introspectResult);
+  router.introspectXML("/").assertEndsWith(`<node name="/"><node name="root"/></node>`);
 }
