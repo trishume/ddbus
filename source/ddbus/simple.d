@@ -3,7 +3,9 @@ module ddbus.simple;
 import ddbus.thin;
 import ddbus.util;
 import ddbus.c_lib;
+import ddbus.router;
 import std.string;
+import std.traits;
 
 class PathIface {
   this(Connection conn, string dest, string path, string iface) {
@@ -40,4 +42,46 @@ unittest {
   auto names = obj.GetNameOwner("org.freedesktop.DBus").to!string();
   names.assertEqual("org.freedesktop.DBus");
   obj.call!string("GetNameOwner","org.freedesktop.DBus").assertEqual("org.freedesktop.DBus");
+}
+
+/**
+   Registers all *possible* methods of an object in a router.
+   It will not register methods that use types that ddbus can't handle.
+
+   The implementation is rather hacky and uses the compiles trait to check for things
+   working so if some methods randomly don't seem to be added, you should probably use
+   setHandler on the router directly. It is also not efficient and creates a closure for every method.
+
+   TODO: replace this with something that generates a wrapper class who's methods take and return messages
+   and basically do what MessageRouter.setHandler does but avoiding duplication. Then this DBusWrapper!Class
+   could be instantiated with any object efficiently and placed in the router table with minimal duplication.
+ */
+void registerMethods(T : Object)(MessageRouter router, string path, string iface, T obj) {
+  MessagePattern patt = MessagePattern(path,iface,"",false);
+  foreach(member; __traits(allMembers, T)) {
+    static if (__traits(compiles, __traits(getOverloads, obj, member))
+               && __traits(getOverloads, obj, member).length > 0
+               && __traits(compiles, router.setHandler(patt, &__traits(getOverloads,obj,member)[0]))) {
+      patt.method = member;
+      router.setHandler(patt, &__traits(getOverloads,obj,member)[0]);
+    }
+  }
+}
+
+unittest {
+  import dunit.toolkit;
+  class Tester {
+    int lol(int x, string s) {return 5;}
+    void wat() {}
+  }
+  auto o = new Tester;
+  auto router = new MessageRouter;
+  registerMethods(router, "/","ca.thume.test",o);
+  MessagePattern patt = MessagePattern("/","ca.thume.test","wat");
+  router.callTable.assertHasKey(patt);
+  patt.method = "lol";
+  router.callTable.assertHasKey(patt);
+  auto res = router.callTable[patt];
+  res.argSig.assertEqual(["i","s"]);
+  res.retSig.assertEqual(["i"]);
 }

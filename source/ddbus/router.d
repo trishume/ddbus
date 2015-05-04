@@ -128,7 +128,7 @@ class MessageRouter {
     formattedWrite(app,introspectHeader,path);
     foreach(iface; ifaces) {
       formattedWrite(app,`<interface name="%s">`,iface.front.iface);
-      foreach(methodPatt; iface) {
+      foreach(methodPatt; iface.array()) {
         formattedWrite(app,`<method name="%s">`,methodPatt.method);
         auto handler = callTable[methodPatt];
         foreach(arg; handler.argSig) {
@@ -149,7 +149,7 @@ class MessageRouter {
     auto children = callTable.byKey().filter!(a => (a.path.startsWith(childPath)) && !a.signal)()
       .map!((s) => s.path.chompPrefix(childPath))
       .map!((s) => s.splitter('/').front)
-      .uniq();
+      .array().sort().uniq();
     foreach(child; children) {
       formattedWrite(app,`<node name="%s"/>`,child);
     }
@@ -199,9 +199,12 @@ unittest{
   router.setHandler!(void,int,string)(patt,(int p, string p2) {});
   patt = MessagePattern("/root/wat","ca.thume.tester","lolwut");
   router.setHandler!(int,int)(patt,(int p) {return 6;});
+  patt = MessagePattern("/troll","ca.thume.tester","wow");
+  router.setHandler!(void)(patt,{return;});
 
+  // TODO: these tests rely on nondeterministic hash map ordering
   static string introspectResult = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="wat"/></node>`;
   router.introspectXML("/root").assertEqual(introspectResult);
-  router.introspectXML("/").assertEndsWith(`<node name="/"><node name="root"/></node>`);
+  router.introspectXML("/").assertEndsWith(`<node name="/"><node name="root"/><node name="troll"/></node>`);
 }
