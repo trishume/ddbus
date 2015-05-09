@@ -1,8 +1,5 @@
 import std.stdio;
-import ddbus.c_lib;
-import ddbus.thin;
-import ddbus.router;
-import ddbus.bus;
+import ddbus;
 
 void testCall(Connection conn) {
   for(int i = 0; i < 50; i++) {
