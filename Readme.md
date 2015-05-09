@@ -11,6 +11,20 @@ It currently supports:
 - Seamlessly converting too and from D types
 - Handling method calls and signals (includes introspection support)
 
+# Installation
+
+Before using, you will need to have the DBus C library installed on your computer to link with, and probably also a DBus session bus running so that you can actually do things.
+
+`ddbus` is available on [DUB](http://code.dlang.org/packages/ddbus) so you can simply include it in your `dub.json`:
+```json
+{
+	...
+	"dependencies": {
+		"ddbus": "~>1.0.0"
+	}
+}
+```
+
 # Usage
 
 ## Call Interface
