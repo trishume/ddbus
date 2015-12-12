@@ -76,13 +76,13 @@ class MessageRouter {
       handleIntrospect(pattern.path, msg, conn);
       return true;
     }
-    
+
     MessageHandler* handler = (pattern in callTable);
     if(handler is null) return false;
 
     // Check for matching argument types
     version(DDBusNoChecking) {
-      
+
     } else {
       if(!equal(join(handler.argSig), msg.signature())) {
         return false;
@@ -122,8 +122,8 @@ class MessageRouter {
   string introspectXML(string path) {
     auto methods = callTable.byKey().filter!(a => (a.path == path) && !a.signal)().array()
       // .schwartzSort!((a) => a.iface, "a<b")();
-      .sort!((a,b) => a.iface < b.iface)().release();
-    auto ifaces = groupBy!((a) => a.iface)(methods);
+      .sort!((a,b) => a.iface < b.iface)();
+    auto ifaces = methods.groupBy();
     auto app = appender!string;
     formattedWrite(app,introspectHeader,path);
     foreach(iface; ifaces) {
@@ -153,7 +153,7 @@ class MessageRouter {
     foreach(child; children) {
       formattedWrite(app,`<node name="%s"/>`,child);
     }
-    
+
     app.put("</node>");
     return app.data;
   }

@@ -9,3 +9,7 @@ end
 task :testSignal do
   sh "dbus-send --dest=ca.thume.ddbus.test /signaler ca.thume.test.signal int32:9"
 end
+
+task :testDbus do
+  sh "dbus-send --session --dest=org.freedesktop.DBus --type=method_call --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames"
+end
