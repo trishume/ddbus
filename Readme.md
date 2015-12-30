@@ -42,6 +42,21 @@ auto name = obj.GetNameOwner("org.freedesktop.DBus").to!string();
 obj.call!string("GetNameOwner","org.freedesktop.DBus");
 ```
 
+### Working with properties
+
+```d
+import ddbus;
+Connection conn = connectToBus();
+PathIface obj = new PathIface(conn, "org.freedesktop.secrets", "/org/freedesktop/secrets/collection/login", "org.freedesktop.DBus.Properties");
+
+// read property
+string loginLabel = obj.Get("org.freedesktop.Secret.Collection", "Label").to!string();
+loginLabel = "Secret"~login;
+// write it back (variant type requires variant() wrapper)
+obj.Set("org.freedesktop.Secret.Collection", "Label", variant(loginLabel));
+```
+Setting read only properties results in a thrown `DBusException`.
+
 ## Server Interface
 
 You can register a delegate into a `MessageRouter` and a main loop in order to handle messages.

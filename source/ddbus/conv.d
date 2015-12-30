@@ -28,6 +28,12 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
         buildIter(&sub, x);
       }
       dbus_message_iter_close_container(iter, &sub);
+    } else static if(isVariant!T) {
+      DBusMessageIter sub;
+      const(char)* subSig = typeSig!(VariantType!T).toStringz();
+      dbus_message_iter_open_container(iter, 'v', subSig, &sub);
+      buildIter(&sub, arg.data);
+      dbus_message_iter_close_container(iter, &sub);
     } else static if(basicDBus!T) {
       dbus_message_iter_append_basic(iter,typeCode!T,&arg);
     }
@@ -36,6 +42,15 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
 
 T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   T ret;
+  static if(!isVariant!T) {
+    if(dbus_message_iter_get_arg_type(iter) == 'v') {
+      DBusMessageIter sub;
+      dbus_message_iter_recurse(iter, &sub);
+      ret = readIter!T(&sub);
+      dbus_message_iter_next(iter);
+      return ret;
+    }
+  }
   static if(isTuple!T) {
     assert(dbus_message_iter_get_arg_type(iter) == 'r');
   } else {
@@ -60,6 +75,10 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     while(dbus_message_iter_get_arg_type(&sub) != 0) {
       ret ~= readIter!U(&sub);
     }
+  } else static if(isVariant!T) {
+    DBusMessageIter sub;
+    dbus_message_iter_recurse(iter, &sub);
+    ret.data = readIter!(VariantType!T)(&sub);
   } else static if(basicDBus!T) {
     dbus_message_iter_get_basic(iter, &ret);
   }
@@ -76,17 +95,19 @@ void readIterTuple(Tup)(DBusMessageIter *iter, ref Tup tuple) if(isTuple!Tup && 
 unittest {
   import dunit.toolkit;
   import ddbus.thin;
+  Variant!T var(T)(T data){ return Variant!T(data); }
   Message msg = Message("org.example.wow","/wut","org.test.iface","meth");
   bool[] emptyB;
-  auto args = tuple(5,true,"wow",[6,5],tuple(6.2,4,[["lol"]],emptyB));
+  auto args = tuple(5,true,"wow",var(5.9),[6,5],tuple(6.2,4,[["lol"]],emptyB,var([4,2])));
   msg.build(args.expand);
-  msg.signature().assertEqual("ibsai(diaasab)");
+  msg.signature().assertEqual("ibsvai(diaasabv)");
   msg.readTuple!(typeof(args))().assertEqual(args);
   DBusMessageIter iter;
   dbus_message_iter_init(msg.msg, &iter);
   readIter!int(&iter).assertEqual(5);
   readIter!bool(&iter).assertEqual(true);
   readIter!string(&iter).assertEqual("wow");
+  readIter!double(&iter).assertEqual(5.9);
   readIter!(int[])(&iter).assertEqual([6,5]);
-  readIter!(Tuple!(double,int,string[][],bool[]))(&iter).assertEqual(tuple(6.2,4,[["lol"]],emptyB));
+  readIter!(Tuple!(double,int,string[][],bool[],Variant!(int[])))(&iter).assertEqual(tuple(6.2,4,[["lol"]],emptyB,var([4,2])));
 }

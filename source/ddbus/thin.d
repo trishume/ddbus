@@ -26,6 +26,14 @@ T wrapErrors(T)(T delegate(DBusError *err) del) {
   return ret;
 }
 
+struct Variant(T) {
+  T data;
+}
+
+Variant!T variant(T)(T data) {
+  return Variant!T(data);
+}
+
 enum MessageType {
   Invalid = 0,
   Call, Return, Error, Signal
