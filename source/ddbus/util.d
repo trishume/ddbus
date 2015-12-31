@@ -1,6 +1,24 @@
 module ddbus.util;
+
+import ddbus.thin;
 import std.typecons;
 import std.range;
+import std.traits;
+
+template isVariant(T) {
+  static if(isBasicType!T || isInputRange!T) {
+    enum isVariant = false;
+  } else static if(__traits(compiles, TemplateOf!T) 
+                && __traits(isSame, TemplateOf!T, Variant)) {
+    enum isVariant = true;
+  } else {
+    enum isVariant = false;
+  }
+}
+
+template VariantType(T) {
+  alias VariantType = TemplateArgsOf!(T)[0];
+}
 
 template allCanDBus(TS...) {
   static if (TS.length == 0) {
@@ -25,6 +43,8 @@ template basicDBus(T) {
 template canDBus(T) {
   static if(basicDBus!T) {
     enum canDBus = true;
+  } else static if(isVariant!T) {
+    enum canDBus = canDBus!(VariantType!T);
   } else static if(isTuple!T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
@@ -38,7 +58,7 @@ unittest {
   (canDBus!int).assertTrue();
   (canDBus!(int[])).assertTrue();
   (allCanDBus!(int,string,bool)).assertTrue();
-  (canDBus!(Tuple!(int[],bool))).assertTrue();
+  (canDBus!(Tuple!(int[],bool,Variant!short))).assertTrue();
   (canDBus!(Tuple!(int[],int[string]))).assertFalse();
   (canDBus!(int[string])).assertFalse();
 }
@@ -64,8 +84,8 @@ string typeSig(T)() if(canDBus!T) {
     return "d";
   } else static if(is(T == string)) {
     return "s";
-  } else static if(is(T == void)) {
-    return "";
+  } else static if(isVariant!T) {
+    return "v";
   } else static if(isTuple!T) {
     string sig = "(";
     foreach(i, S; T.Types) {
@@ -105,11 +125,13 @@ unittest {
   typeSig!int().assertEqual("i");
   typeSig!bool().assertEqual("b");
   typeSig!string().assertEqual("s");
+  typeSig!(Variant!int)().assertEqual("v");
   // structs
   typeSig!(Tuple!(int,string,string)).assertEqual("(iss)");
-  typeSig!(Tuple!(int,string,Tuple!(int,"k",double,"x"))).assertEqual("(is(id))");
+  typeSig!(Tuple!(int,string,Variant!int,Tuple!(int,"k",double,"x"))).assertEqual("(isv(id))");
   // arrays
   typeSig!(int[]).assertEqual("ai");
+  typeSig!(Variant!int[]).assertEqual("av");
   typeSig!(Tuple!(byte)[][]).assertEqual("aa(y)");
   // multiple arguments
   typeSigAll!(int,bool).assertEqual("ib");
