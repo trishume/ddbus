@@ -4,7 +4,7 @@ import std.range;
 
 template allCanDBus(TS...) {
   static if (TS.length == 0) {
-    enum allCanDBus = true; 
+    enum allCanDBus = true;
   } else static if(!canDBus!(TS[0])) {
     enum allCanDBus = false;
   } else {
@@ -29,6 +29,8 @@ template canDBus(T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
     enum canDBus = canDBus!(ElementType!T);
+  } else static if(isAssociativeArray!T) {
+    enum canDBus = canDBus!(ValueType!T) && basicDBus!(KeyType!T);
   } else {
     enum canDBus = false;
   }
@@ -70,11 +72,13 @@ string typeSig(T)() if(canDBus!T) {
     string sig = "(";
     foreach(i, S; T.Types) {
       sig ~= typeSig!S();
-    } 
+    }
     sig ~= ")";
     return sig;
   } else static if(isInputRange!T) {
     return "a" ~ typeSig!(ElementType!T)();
+  } else static if(isAssociativeArray!T) {
+    return "a{" ~ typeSig!(KeyType!T)() ~ typeSig!(ValueType!T)() ~ "}";
   }
 }
 
@@ -95,8 +99,12 @@ string[] typeSigArr(TS...)() if(allCanDBus!TS) {
 }
 
 int typeCode(T)() if(canDBus!T) {
-  string sig = typeSig!T();
-  return sig[0];
+  static if(isTuple!T) {
+    return 'r';
+  } else {
+    string sig = typeSig!T();
+    return sig[0];
+  }
 }
 
 unittest {
@@ -120,8 +128,8 @@ unittest {
   static string sig = typeSig!ulong();
   sig.assertEqual("t");
   static string sig2 = typeSig!(Tuple!(int,string,string));
-  sig2.assertEqual("(iss)"); 
+  sig2.assertEqual("(iss)");
   static string sig3 = typeSigAll!(int,string,string);
-  sig3.assertEqual("iss"); 
+  sig3.assertEqual("iss");
 }
 

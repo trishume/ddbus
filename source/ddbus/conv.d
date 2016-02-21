@@ -28,6 +28,17 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
         buildIter(&sub, x);
       }
       dbus_message_iter_close_container(iter, &sub);
+    } else static if(isAssociativeArray!T) {
+      DBusMessageIter sub;
+      const(char)* subSig = (typeSig!T())[1..$].toStringz(); // trim off "a" with slice syntax
+      dbus_message_iter_open_container(iter, 'a', subSig, &sub);
+      foreach(x; arg.byKeyValue()) {
+        DBusMessageIter subsub;
+        dbus_message_iter_open_container(sub, 'e', null, &subsub);
+        buildIter(&subsub, x.key, x.value);
+        dbus_message_iter_close_container(sub, &subsub);
+      }
+      dbus_message_iter_close_container(iter, &sub);
     } else static if(basicDBus!T) {
       dbus_message_iter_append_basic(iter,typeCode!T,&arg);
     }
@@ -36,11 +47,7 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
 
 T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   T ret;
-  static if(isTuple!T) {
-    assert(dbus_message_iter_get_arg_type(iter) == 'r');
-  } else {
-    assert(dbus_message_iter_get_arg_type(iter) == typeCode!T());
-  }
+  assert(dbus_message_iter_get_arg_type(iter) == typeCode!T());
   static if(is(T==string)) {
     const(char)* cStr;
     dbus_message_iter_get_basic(iter, &cStr);
@@ -59,6 +66,15 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     dbus_message_iter_recurse(iter, &sub);
     while(dbus_message_iter_get_arg_type(&sub) != 0) {
       ret ~= readIter!U(&sub);
+    }
+  } else static if(isAssociativeArray!T) {
+    assert(dbus_message_iter_get_element_type(iter) == 'e');
+    DBusMessageIter sub;
+    dbus_message_iter_recurse(iter, &sub);
+    while(dbus_message_iter_get_arg_type(&sub) != 0) {
+      DBusMessageIter subsub;
+      dbus_message_iter_recurse(sub, &subsub);
+      ret[readIter!(KeyType!T)(subsub)] = readIter!(ValueType!T)(subsub);
     }
   } else static if(basicDBus!T) {
     dbus_message_iter_get_basic(iter, &ret);
