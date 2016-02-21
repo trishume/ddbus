@@ -5,6 +5,7 @@ import ddbus.util;
 import std.string;
 import std.typecons;
 import std.range;
+import std.traits;
 
 void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
   foreach(index, arg; args) {

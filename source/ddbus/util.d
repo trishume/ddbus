@@ -1,6 +1,7 @@
 module ddbus.util;
 import std.typecons;
 import std.range;
+import std.traits;
 
 template allCanDBus(TS...) {
   static if (TS.length == 0) {
