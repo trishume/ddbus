@@ -99,7 +99,10 @@ class MessageRouter {
       auto retMsg = call.createReturn();
       static if(!is(Ret == void)) {
         Ret ret = handler(args.expand);
-        retMsg.build(ret);
+        static if (is(Ret == Tuple!T, T...))
+          retMsg.build!T(ret.expand);
+        else
+          retMsg.build(ret);
       } else {
         handler(args.expand);
       }
