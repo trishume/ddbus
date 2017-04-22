@@ -5,6 +5,17 @@ import std.typecons;
 import std.range;
 import std.traits;
 
+struct DictionaryEntry(K, V) {
+  K key;
+  V value;
+}
+
+auto byDictionaryEntries(K, V)(V[K] aa) {
+  import std.algorithm : map;
+
+  return aa.byKeyValue.map!(pair => DictionaryEntry!(K, V)(pair.key, pair.value));
+}
+
 template isVariant(T) {
   static if(isBasicType!T || isInputRange!T) {
     enum isVariant = false;
@@ -49,6 +60,10 @@ template canDBus(T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
     enum canDBus = canDBus!(ElementType!T);
+  } else static if(isAssociativeArray!T) {
+    enum canDBus = canDBus!(KeyType!T) && canDBus!(ValueType!T);
+  } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
+    enum canDBus = canDBus!K && canDBus!V;
   } else {
     enum canDBus = false;
   }
@@ -59,8 +74,8 @@ unittest {
   (canDBus!(int[])).assertTrue();
   (allCanDBus!(int,string,bool)).assertTrue();
   (canDBus!(Tuple!(int[],bool,Variant!short))).assertTrue();
-  (canDBus!(Tuple!(int[],int[string]))).assertFalse();
-  (canDBus!(int[string])).assertFalse();
+  (canDBus!(Tuple!(int[],int[string]))).assertTrue();
+  (canDBus!(int[string])).assertTrue();
 }
 
 string typeSig(T)() if(canDBus!T) {
@@ -93,8 +108,12 @@ string typeSig(T)() if(canDBus!T) {
     } 
     sig ~= ")";
     return sig;
+  } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
+    return '{' ~ typeSig!K ~ typeSig!V ~ '}';
   } else static if(isInputRange!T) {
     return "a" ~ typeSig!(ElementType!T)();
+  } else static if(isAssociativeArray!T) {
+    return "a{" ~ typeSig!(KeyType!T) ~ typeSig!(ValueType!T) ~ "}";
   }
 }
 
@@ -133,6 +152,9 @@ unittest {
   typeSig!(int[]).assertEqual("ai");
   typeSig!(Variant!int[]).assertEqual("av");
   typeSig!(Tuple!(byte)[][]).assertEqual("aa(y)");
+  // dictionaries
+  typeSig!(int[string]).assertEqual("a{si}");
+  typeSig!(DictionaryEntry!(string, int)).assertEqual("{si}");
   // multiple arguments
   typeSigAll!(int,bool).assertEqual("ib");
   // type codes

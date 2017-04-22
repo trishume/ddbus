@@ -71,7 +71,7 @@ void registerMethods(T : Object)(MessageRouter router, string path, string iface
 unittest {
   import dunit.toolkit;
   class Tester {
-    int lol(int x, string s) {return 5;}
+    int lol(int x, string s, string[string] map) {return 5;}
     void wat() {}
   }
   auto o = new Tester;
@@ -82,6 +82,6 @@ unittest {
   patt.method = "lol";
   router.callTable.assertHasKey(patt);
   auto res = router.callTable[patt];
-  res.argSig.assertEqual(["i","s"]);
+  res.argSig.assertEqual(["i","s", "a{ss}"]);
   res.retSig.assertEqual(["i"]);
 }
