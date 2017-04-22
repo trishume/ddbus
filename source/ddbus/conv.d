@@ -83,7 +83,7 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     ret.key = readIter!K(&sub);
-    ret.value = readIter!K(&sub);
+    ret.value = readIter!V(&sub);
   } else static if(is(T t : U[], U)) {
     assert(dbus_message_iter_get_element_type(iter) == typeCode!U);
     DBusMessageIter sub;
