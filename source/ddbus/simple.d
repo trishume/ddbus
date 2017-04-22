@@ -44,6 +44,8 @@ unittest {
   obj.call!string("GetNameOwner","org.freedesktop.DBus").assertEqual("org.freedesktop.DBus");
 }
 
+enum SignalMethod;
+
 /**
    Registers all *possible* methods of an object in a router.
    It will not register methods that use types that ddbus can't handle.
@@ -63,6 +65,7 @@ void registerMethods(T : Object)(MessageRouter router, string path, string iface
                && __traits(getOverloads, obj, member).length > 0
                && __traits(compiles, router.setHandler(patt, &__traits(getOverloads,obj,member)[0]))) {
       patt.method = member;
+      patt.signal = hasUDA!(__traits(getOverloads,obj,member)[0], SignalMethod);
       router.setHandler(patt, &__traits(getOverloads,obj,member)[0]);
     }
   }
@@ -73,13 +76,19 @@ unittest {
   class Tester {
     int lol(int x, string s) {return 5;}
     void wat() {}
+    @SignalMethod
+    void signalRecv() {}
   }
   auto o = new Tester;
   auto router = new MessageRouter;
   registerMethods(router, "/","ca.thume.test",o);
   MessagePattern patt = MessagePattern("/","ca.thume.test","wat");
   router.callTable.assertHasKey(patt);
+  patt.method = "signalRecv";
+  patt.signal = true;
+  router.callTable.assertHasKey(patt);
   patt.method = "lol";
+  patt.signal = false;
   router.callTable.assertHasKey(patt);
   auto res = router.callTable[patt];
   res.argSig.assertEqual(["i","s"]);
