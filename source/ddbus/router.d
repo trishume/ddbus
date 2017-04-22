@@ -110,7 +110,7 @@ class MessageRouter {
     static if(is(Ret==void)) {
       static string[] ret = [];
     } else {
-      static string[] ret = [typeSig!Ret];
+      static string[] ret = typeSigReturn!Ret;
     }
     MessageHandler handleStruct = {func: &handlerWrapper, argSig: args, retSig: ret};
     callTable[patt] = handleStruct;
@@ -199,12 +199,17 @@ unittest{
   router.setHandler!(void,int,string)(patt,(int p, string p2) {});
   patt = MessagePattern("/root/wat","ca.thume.tester","lolwut");
   router.setHandler!(int,int)(patt,(int p) {return 6;});
+  patt = MessagePattern("/root/foo","ca.thume.tester","lolwut");
+  router.setHandler!(Tuple!(string,string,int),int)(patt,(int p) {Tuple!(string,string,int) ret; ret[0] = "a"; ret[1] = "b"; ret[2] = p; return ret;});
   patt = MessagePattern("/troll","ca.thume.tester","wow");
   router.setHandler!(void)(patt,{return;});
 
   // TODO: these tests rely on nondeterministic hash map ordering
   static string introspectResult = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
-<node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="wat"/></node>`;
+<node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="foo"/><node name="wat"/></node>`;
   router.introspectXML("/root").assertEqual(introspectResult);
+  static string introspectResult2 = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/root/foo"><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="out"/><arg type="s" direction="out"/><arg type="i" direction="out"/></method></interface></node>`;
+  router.introspectXML("/root/foo").assertEqual(introspectResult2);
   router.introspectXML("/").assertEndsWith(`<node name="/"><node name="root"/><node name="troll"/></node>`);
 }
