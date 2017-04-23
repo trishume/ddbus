@@ -32,54 +32,59 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       dbus_message_iter_close_container(iter, &sub);
     } else static if(isAssociativeArray!T) {
       buildIter(iter, arg.byDictionaryEntries);
+    } else static if(is(T == DBusAny) || is(T == Variant!DBusAny)) {
+      static if(is(T == Variant!DBusAny)) {
+        auto val = arg.data;
+        val.explicitVariant = true;
+      } else
+        auto val = arg;
+      DBusMessageIter subStore;
+      DBusMessageIter* sub = &subStore;
+      char[] sig = [cast(char) val.type];
+      if(val.type == 'a')
+        sig ~= val.signature;
+      else if(val.type == 'r')
+        sig = val.signature;
+      sig ~= '\0';
+      if (!val.explicitVariant)
+        sub = iter;
+      else
+        dbus_message_iter_open_container(iter, 'v', sig.ptr, sub);
+      if(val.type == 's') {
+        immutable(char)* cStr = val.str.toStringz();
+        dbus_message_iter_append_basic(sub,'s',&cStr);
+      } else if(val.type == 'b') {
+        dbus_bool_t longerBool = val.boolean; // dbus bools are ints
+        dbus_message_iter_append_basic(sub,'b',&longerBool);
+      } else if(dbus_type_is_basic(val.type)) {
+        dbus_message_iter_append_basic(sub,val.type,&val.int64);
+      } else if(val.type == 'a') {
+        DBusMessageIter arr;
+        dbus_message_iter_open_container(sub, 'a', sig[1 .. $].ptr, &arr);
+        foreach(item; val.array)
+          buildIter(&arr, item);
+        dbus_message_iter_close_container(sub, &arr);
+      } else if(val.type == 'r') {
+        DBusMessageIter arr;
+        dbus_message_iter_open_container(sub, 'r', null, &arr);
+        foreach(item; val.tuple)
+          buildIter(&arr, item);
+        dbus_message_iter_close_container(sub, &arr);
+      } else if(val.type == 'e') {
+        DBusMessageIter entry;
+        dbus_message_iter_open_container(sub, 'e', null, &entry);
+        buildIter(&entry, val.entry.key);
+        buildIter(&entry, val.entry.value);
+        dbus_message_iter_close_container(sub, &entry);
+      }
+      if(val.explicitVariant)
+        dbus_message_iter_close_container(iter, sub);
     } else static if(isVariant!T) {
       DBusMessageIter sub;
       const(char)* subSig = typeSig!(VariantType!T).toStringz();
       dbus_message_iter_open_container(iter, 'v', subSig, &sub);
       buildIter(&sub, arg.data);
       dbus_message_iter_close_container(iter, &sub);
-    } else static if(is(T == DBusAny)) {
-      DBusMessageIter subStore;
-      DBusMessageIter* sub = &subStore;
-      char[] sig = [cast(char) arg.type];
-      if(arg.type == 'a')
-        sig ~= arg.signature;
-      else if(arg.type == 'r')
-        sig = arg.signature;
-      sig ~= '\0';
-      if (!arg.explicitVariant)
-        sub = iter;
-      else
-        dbus_message_iter_open_container(iter, 'v', sig.ptr, sub);
-      if(arg.type == 's') {
-        immutable(char)* cStr = arg.str.toStringz();
-        dbus_message_iter_append_basic(sub,'s',&cStr);
-      } else if(arg.type == 'b') {
-        dbus_bool_t longerBool = arg.boolean; // dbus bools are ints
-        dbus_message_iter_append_basic(sub,'b',&longerBool);
-      } else if(dbus_type_is_basic(arg.type)) {
-        dbus_message_iter_append_basic(sub,arg.type,&arg.int64);
-      } else if(arg.type == 'a') {
-        DBusMessageIter arr;
-        dbus_message_iter_open_container(sub, 'a', sig[1 .. $].ptr, &arr);
-        foreach(item; arg.array)
-          buildIter(&arr, item);
-        dbus_message_iter_close_container(sub, &arr);
-      } else if(arg.type == 'r') {
-        DBusMessageIter arr;
-        dbus_message_iter_open_container(sub, 'r', null, &arr);
-        foreach(item; arg.tuple)
-          buildIter(&arr, item);
-        dbus_message_iter_close_container(sub, &arr);
-      } else if(arg.type == 'e') {
-        DBusMessageIter entry;
-        dbus_message_iter_open_container(sub, 'e', null, &entry);
-        buildIter(&entry, arg.entry.key);
-        buildIter(&entry, arg.entry.value);
-        dbus_message_iter_close_container(sub, &entry);
-      }
-      if(arg.explicitVariant)
-        dbus_message_iter_close_container(iter, sub);
     } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
       DBusMessageIter sub;
       dbus_message_iter_open_container(iter, 'e', null, &sub);
@@ -94,13 +99,17 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
 
 T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   T ret;
-  static if(!isVariant!T) {
+  static if(!isVariant!T || is(T == Variant!DBusAny)) {
     if(dbus_message_iter_get_arg_type(iter) == 'v') {
       DBusMessageIter sub;
       dbus_message_iter_recurse(iter, &sub);
-      ret = readIter!T(&sub);
-      static if(is(T == DBusAny))
-        ret.explicitVariant = true;
+      static if(is(T == Variant!DBusAny)) {
+        ret = variant(readIter!DBusAny(&sub));
+      } else {
+        ret = readIter!T(&sub);
+        static if(is(T == DBusAny))
+          ret.explicitVariant = true;
+      }
       dbus_message_iter_next(iter);
       return ret;
     }
@@ -109,7 +118,7 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     assert(dbus_message_iter_get_arg_type(iter) == 'r');
   } else static if(is(T == DictionaryEntry!(K1, V1), K1, V1)) {
     assert(dbus_message_iter_get_arg_type(iter) == 'e');
-  } else static if(!is(T == DBusAny)) {
+  } else static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
     assert(dbus_message_iter_get_arg_type(iter) == typeCode!T());
   }
   static if(is(T==string)) {
@@ -211,13 +220,13 @@ unittest {
   anyVar.uint64.assertEqual(1561);
   anyVar.explicitVariant.assertEqual(false);
   auto tupleMember = DBusAny(tuple(Variant!int(45), Variant!ushort(5), 32, [1, 2], tuple(variant(4), 5), map));
-  DBusAny complexVar = DBusAny(variant([
+  Variant!DBusAny complexVar = variant(DBusAny([
     "hello world": variant(DBusAny(1337)),
     "array value": variant(DBusAny([42, 64])),
     "tuple value": variant(tupleMember)
   ]));
-  complexVar.type.assertEqual('a');
-  complexVar.signature.assertEqual("{sv}".dup);
+  complexVar.data.type.assertEqual('a');
+  complexVar.data.signature.assertEqual("{sv}".dup);
   tupleMember.signature.assertEqual("(vviai(vi)a{ss})");
   auto args = tuple(5,true,"wow",var(5.9),[6,5],tuple(6.2,4,[["lol"]],emptyB,var([4,2])),map,anyVar,complexVar);
   msg.build(args.expand);
@@ -233,5 +242,5 @@ unittest {
   readIter!(Tuple!(double,int,string[][],bool[],Variant!(int[])))(&iter).assertEqual(tuple(6.2,4,[["lol"]],emptyB,var([4,2])));
   readIter!(string[string])(&iter).assertEqual(["hello": "world"]);
   readIter!DBusAny(&iter).assertEqual(anyVar);
-  readIter!DBusAny(&iter).assertEqual(complexVar);
+  readIter!(Variant!DBusAny)(&iter).assertEqual(complexVar);
 }
