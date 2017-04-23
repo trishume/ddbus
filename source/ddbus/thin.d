@@ -140,6 +140,7 @@ struct DBusAny {
         entry.value = DBusAny(value.value);
     } else static if(isInputRange!T) {
       this.type = 'a';
+      static assert(!is(ElementType!T == DBusAny), "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
       this.signature = typeSig!(ElementType!T).dup;
       this.explicitVariant = false;
       foreach(elem; value)
@@ -230,9 +231,18 @@ struct DBusAny {
     return aa;
   }
 
-  /// Converts a basic type or an array to the D type with type checking. Tuples can get converted to an array.
+  /// Converts a basic type, a tuple or an array to the D type with type checking. Tuples can get converted to an array too.
   T to(T)() {
-    static if(isIntegral!T || isFloatingPoint!T) {
+    static if(is(T == Variant!R, R)) {
+      static if(is(R == DBusAny)) {
+        auto v = to!R;
+        v.explicitVariant = false;
+        return Variant!R(v);
+      } else
+        return Variant!R(to!R);
+    } else static if(is(T == DBusAny)) {
+      return this;
+    } else static if(isIntegral!T || isFloatingPoint!T) {
       switch(type) {
       case typeCode!byte:
         return cast(T) int8;
@@ -253,6 +263,11 @@ struct DBusAny {
       default:
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
       }
+    } else static if(is(T == bool)) {
+      if(type == 'b')
+        return boolean;
+      else
+        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
     } else static if(isSomeString!T) {
       if(type == 's')
         return str.to!T;
@@ -264,6 +279,21 @@ struct DBusAny {
       T ret;
       foreach(elem; array)
         ret ~= elem.to!(ElementType!T);
+      return ret;
+    } else static if(isTuple!T) {
+      if(type != 'r')
+        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
+      T ret;
+      enforce(ret.Types.length == tuple.length, "Tuple length mismatch");
+      foreach(index, T; ret.Types)
+        ret[index] = tuple[index].to!T;
+      return ret;
+    } else static if(isAssociativeArray!T) {
+      if(type != 'a' || !signature || signature[0] != '{')
+        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
+      T ret;
+      foreach(pair; array)
+        ret[pair.entry.key.to!(KeyType!T)] = pair.entry.value.to!(ValueType!T);
       return ret;
     } else static assert(false, "Can't convert variant to " ~ T.stringof);
   }
@@ -284,6 +314,49 @@ struct DBusAny {
     else
       return uint64 == b.uint64;
   }
+}
+
+unittest {
+  import dunit.toolkit;
+  DBusAny set(string member, T)(DBusAny v, T value) {
+    mixin("v." ~ member ~ " = value;");
+    return v;
+  }
+
+  void test(T)(T value, DBusAny b) {
+    assertEqual(DBusAny(value), b);
+    assertEqual(b.to!T, value);
+    b.toString();
+  }
+
+  test(cast(ubyte) 184, set!"int8"(DBusAny('y', null, false), cast(byte) 184));
+  test(cast(short) 184, set!"int16"(DBusAny('n', null, false), cast(short) 184));
+  test(cast(ushort) 184, set!"uint16"(DBusAny('q', null, false), cast(ushort) 184));
+  test(cast(int) 184, set!"int32"(DBusAny('i', null, false), cast(int) 184));
+  test(cast(uint) 184, set!"uint32"(DBusAny('u', null, false), cast(uint) 184));
+  test(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
+  test(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
+  test(true, set!"boolean"(DBusAny('b', null, false), true));
+
+  test(variant(cast(ubyte) 184), set!"int8"(DBusAny('y', null, true), cast(byte) 184));
+  test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
+  test(variant(cast(ushort) 184), set!"uint16"(DBusAny('q', null, true), cast(ushort) 184));
+  test(variant(cast(int) 184), set!"int32"(DBusAny('i', null, true), cast(int) 184));
+  test(variant(cast(uint) 184), set!"uint32"(DBusAny('u', null, true), cast(uint) 184));
+  test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
+  test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
+  test(variant(true), set!"boolean"(DBusAny('b', null, true), true));
+
+  test(variant(DBusAny(5)), set!"int32"(DBusAny('i', null, true), 5));
+
+  test([1, 2, 3], set!"array"(DBusAny('a', ['i'], false), [DBusAny(1), DBusAny(2), DBusAny(3)]));
+  test(variant([1, 2, 3]), set!"array"(DBusAny('a', ['i'], true), [DBusAny(1), DBusAny(2), DBusAny(3)]));
+
+  test(tuple("a", 4, [1, 2]), set!"tuple"(DBusAny('r', "(siai)".dup, false), [DBusAny("a"), DBusAny(4), DBusAny([1, 2])]));
+  test(tuple("a", variant(4), variant([1, 2])), set!"tuple"(DBusAny('r', "(svv)".dup, false), [DBusAny("a"), DBusAny(variant(4)), DBusAny(variant([1, 2]))]));
+
+  test(["a": "b"], set!"array"(DBusAny('a', "{ss}".dup, false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny("a"), DBusAny("b")))]));
+  test([variant("a"): 4], set!"array"(DBusAny('a', "{vi}".dup, false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny(variant("a")), DBusAny(4)))]));
 }
 
 /// Marks the data as variant on serialization
