@@ -52,7 +52,7 @@ template basicDBus(T) {
 }
 
 template canDBus(T) {
-  static if(basicDBus!T) {
+  static if(basicDBus!T || is(T == DBusAny)) {
     enum canDBus = true;
   } else static if(isVariant!T) {
     enum canDBus = canDBus!(VariantType!T);
@@ -101,6 +101,8 @@ string typeSig(T)() if(canDBus!T) {
     return "s";
   } else static if(isVariant!T) {
     return "v";
+  } else static if(is(T == DBusAny)) {
+    static assert(false, "Cannot determine type signature of DBusAny. Change to Variant!DBusAny if a variant was desired.");
   } else static if(isTuple!T) {
     string sig = "(";
     foreach(i, S; T.Types) {
