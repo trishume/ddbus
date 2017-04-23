@@ -68,6 +68,8 @@ struct DBusAny {
     DBusAny[] tuple;
     ///
     DictionaryEntry!(DBusAny, DBusAny)* entry;
+    ///
+    ubyte[] binaryData;
   }
 
   /// Manually creates a DBusAny object using a type, signature and implicit specifier.
@@ -115,9 +117,12 @@ struct DBusAny {
         type = value.data.type;
         signature = value.data.signature;
         explicitVariant = true;
-        if(type == 'a' || type == 'r')
-          array = value.data.array;
-        if(type == 's')
+        if(type == 'a' || type == 'r') {
+          if(signature == ['y'])
+            binaryData = value.data.binaryData;
+          else
+            array = value.data.array;
+        } else if(type == 's')
           str = value.data.str;
         else if(type == 'e')
           entry = value.data.entry;
@@ -138,9 +143,13 @@ struct DBusAny {
         entry.value = value.value;
       else
         entry.value = DBusAny(value.value);
+    } else static if(is(T == ubyte[]) || is(T == byte[])) {
+      this('a', ['y'], false);
+      binaryData = cast(ubyte[]) value;
     } else static if(isInputRange!T) {
       this.type = 'a';
       static assert(!is(ElementType!T == DBusAny), "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
+      static assert(typeSig!(ElementType!T) != "y");
       this.signature = typeSig!(ElementType!T).dup;
       this.explicitVariant = false;
       foreach(elem; value)
@@ -202,7 +211,12 @@ struct DBusAny {
       valueStr = boolean ? "true" : "false";
       break;
     case 'a':
-      valueStr = '[' ~ array.map!(a => a.toString).join(", ") ~ ']';
+      import std.digest.digest : toHexString;
+
+      if(signature == ['y'])
+        valueStr = "binary(" ~ binaryData.toHexString ~ ')';
+      else
+        valueStr = '[' ~ array.map!(a => a.toString).join(", ") ~ ']';
       break;
     case 'r':
       valueStr = '(' ~ array.map!(a => a.toString).join(", ") ~ ')';
@@ -277,8 +291,13 @@ struct DBusAny {
       if(type != 'a' && type != 'r')
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to an array");
       T ret;
-      foreach(elem; array)
-        ret ~= elem.to!(ElementType!T);
+      if(signature == ['y']) {
+        static if(isIntegral!(ElementType!T))
+          foreach(elem; binaryData)
+            ret ~= elem.to!(ElementType!T);
+      } else
+        foreach(elem; array)
+          ret ~= elem.to!(ElementType!T);
       return ret;
     } else static if(isTuple!T) {
       if(type != 'r')
@@ -303,6 +322,8 @@ struct DBusAny {
       return false;
     if((type == 'a' || type == 'r') && b.signature != signature)
       return false;
+    if(type == 'a' && signature == ['y'])
+      return binaryData == b.binaryData;
     if(type == 'a')
       return array == b.array;
     else if(type == 'r')
@@ -337,6 +358,7 @@ unittest {
   test(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
   test(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
   test(true, set!"boolean"(DBusAny('b', null, false), true));
+  test(cast(ubyte[]) [1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false), cast(ubyte[]) [1, 2, 3]));
 
   test(variant(cast(ubyte) 184), set!"int8"(DBusAny('y', null, true), cast(byte) 184));
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
@@ -346,6 +368,7 @@ unittest {
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
   test(variant(true), set!"boolean"(DBusAny('b', null, true), true));
+  test(variant(cast(ubyte[]) [1, 2, 3]), set!"binaryData"(DBusAny('a', ['y'], true), cast(ubyte[]) [1, 2, 3]));
 
   test(variant(DBusAny(5)), set!"int32"(DBusAny('i', null, true), 5));
 
