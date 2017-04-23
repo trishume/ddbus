@@ -67,8 +67,9 @@ import ddbus;
 MessageRouter router = new MessageRouter();
 // create a pattern to register a handler at a path, interface and method
 MessagePattern patt = MessagePattern("/root","ca.thume.test","test");
-router.setHandler!(int,int)(patt,(int par) {
-  writeln("Called with ", par);
+router.setHandler!(int,int,Variant!DBusAny)(patt,(int par, Variant!DBusAny anyArgument) {
+  // anyArgument can contain any type now, it must be specified as argument using Variant!DBusAny.
+  writeln("Called with ", par, ", ", anyArgument);
   return par;
 });
 // handle a signal
