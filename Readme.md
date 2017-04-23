@@ -158,10 +158,13 @@ runTask({
 });
 ```
 
+It would be better to watch a file descriptor asynchronously in the event loop instead of checking on a timer, but that hasn't been implemented yet, see Todo.
+
 # Todo
 
 `ddbus` should be complete for everyday use but is missing some fanciness that it easily could and should have:
 
+- Support for adding file descriptors to event loops like vibe.d so that it only wakes up when messages arrive and not on a timer.
 - Marshaling of DBus path and file descriptor objects
 - Better efficiency in some places, particularly the object wrapping allocates tons of delegates for every method.
 
