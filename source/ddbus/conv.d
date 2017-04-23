@@ -60,8 +60,12 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       } else if(val.type == 'a') {
         DBusMessageIter arr;
         dbus_message_iter_open_container(sub, 'a', sig[1 .. $].ptr, &arr);
-        foreach(item; val.array)
-          buildIter(&arr, item);
+        if (val.signature == ['y'])
+          foreach (item; val.binaryData)
+            dbus_message_iter_append_basic(&arr, 'y', &item);
+        else
+          foreach(item; val.array)
+            buildIter(&arr, item);
         dbus_message_iter_close_container(sub, &arr);
       } else if(val.type == 'r') {
         DBusMessageIter arr;
@@ -170,9 +174,18 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
       auto sig = dbus_message_iter_get_signature(&sub);
       ret.signature = sig.fromStringz.dup;
       dbus_free(sig);
-      while(dbus_message_iter_get_arg_type(&sub) != 0) {
-        ret.array ~= readIter!DBusAny(&sub);
-      }
+      if (ret.signature == ['y'])
+        while(dbus_message_iter_get_arg_type(&sub) != 0) {
+          ubyte b;
+          assert(dbus_message_iter_get_arg_type(&sub) == 'y');
+          dbus_message_iter_get_basic(&sub, &b);
+          dbus_message_iter_next(&sub);
+          ret.binaryData ~= b;
+        }
+      else
+        while(dbus_message_iter_get_arg_type(&sub) != 0) {
+          ret.array ~= readIter!DBusAny(&sub);
+        }
     } else if(ret.type == 'r') {
       auto sig = dbus_message_iter_get_signature(iter);
       ret.signature = sig.fromStringz.dup;
@@ -218,7 +231,8 @@ unittest {
   Variant!DBusAny complexVar = variant(DBusAny([
     "hello world": variant(DBusAny(1337)),
     "array value": variant(DBusAny([42, 64])),
-    "tuple value": variant(tupleMember)
+    "tuple value": variant(tupleMember),
+    "optimized binary data": variant(DBusAny(cast(ubyte[]) [1, 2, 3, 4, 5, 6]))
   ]));
   complexVar.data.type.assertEqual('a');
   complexVar.data.signature.assertEqual("{sv}".dup);
