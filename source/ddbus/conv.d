@@ -164,8 +164,10 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     ret.explicitVariant = false;
     if(ret.type == 's') {
       ret.str = readIter!string(iter);
+      return ret;
     } else if(ret.type == 'b') {
       ret.boolean = readIter!bool(iter);
+      return ret;
     } else if(dbus_type_is_basic(ret.type)) {
       dbus_message_iter_get_basic(iter, &ret.int64);
     } else if(ret.type == 'a') {
