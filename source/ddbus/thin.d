@@ -292,8 +292,10 @@ struct DBusAny {
       if(type != 'a' || !signature || signature[0] != '{')
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
       T ret;
-      foreach(pair; array)
+      foreach(pair; array) {
+        enforce(pair.type == 'e');
         ret[pair.entry.key.to!(KeyType!T)] = pair.entry.value.to!(ValueType!T);
+      }
       return ret;
     } else static assert(false, "Can't convert variant to " ~ T.stringof);
   }

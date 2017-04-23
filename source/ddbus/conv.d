@@ -36,8 +36,9 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       static if(is(T == Variant!DBusAny)) {
         auto val = arg.data;
         val.explicitVariant = true;
-      } else
+      } else {
         auto val = arg;
+      }
       DBusMessageIter subStore;
       DBusMessageIter* sub = &subStore;
       char[] sig = [cast(char) val.type];
@@ -51,11 +52,9 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       else
         dbus_message_iter_open_container(iter, 'v', sig.ptr, sub);
       if(val.type == 's') {
-        immutable(char)* cStr = val.str.toStringz();
-        dbus_message_iter_append_basic(sub,'s',&cStr);
+        buildIter(sub, val.str);
       } else if(val.type == 'b') {
-        dbus_bool_t longerBool = val.boolean; // dbus bools are ints
-        dbus_message_iter_append_basic(sub,'b',&longerBool);
+        buildIter(sub,val.boolean);
       } else if(dbus_type_is_basic(val.type)) {
         dbus_message_iter_append_basic(sub,val.type,&val.int64);
       } else if(val.type == 'a') {
@@ -160,13 +159,9 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     ret.type = dbus_message_iter_get_arg_type(iter);
     ret.explicitVariant = false;
     if(ret.type == 's') {
-      const(char)* cStr;
-      dbus_message_iter_get_basic(iter, &cStr);
-      ret.str = cStr.fromStringz().idup; // copy string
+      ret.str = readIter!string(iter);
     } else if(ret.type == 'b') {
-      dbus_bool_t longerBool;
-      dbus_message_iter_get_basic(iter, &longerBool);
-      ret.boolean = cast(bool)longerBool;
+      ret.boolean = readIter!bool(iter);
     } else if(dbus_type_is_basic(ret.type)) {
       dbus_message_iter_get_basic(iter, &ret.int64);
     } else if(ret.type == 'a') {
