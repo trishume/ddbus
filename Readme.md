@@ -1,7 +1,7 @@
 # ddbus
 
 <a href="https://code.dlang.org/packages/ddbus" title="Go to ddbus"><img src="https://img.shields.io/dub/v/ddbus.svg" alt="Dub version"></a>
-<a href="https://code.dlang.org/packages/ddbus" title="Go to ddbus"><img src="https://img.shields.io/dub/dt/ddbus.svg" alt="Dub downloads"></a
+<a href="https://code.dlang.org/packages/ddbus" title="Go to ddbus"><img src="https://img.shields.io/dub/dt/ddbus.svg" alt="Dub downloads"></a>
 
 A [dbus](http://www.freedesktop.org/wiki/Software/dbus/) library for the [D programming language](http://dlang.org).
 
