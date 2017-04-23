@@ -98,6 +98,13 @@ string typeSig(T)() if(canDBus!T) {
   }
 }
 
+string[] typeSigReturn(T)() if(canDBus!T) {
+  static if(is(T == Tuple!TS, TS...))
+    return typeSigArr!TS;
+  else
+    return [typeSig!T];
+}
+
 string typeSigAll(TS...)() if(allCanDBus!TS) {
   string sig = "";
   foreach(i,T; TS) {
