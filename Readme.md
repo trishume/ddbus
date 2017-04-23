@@ -18,7 +18,7 @@ Before using, you will need to have the DBus C library installed on your compute
 `ddbus` is available on [DUB](http://code.dlang.org/packages/ddbus) so you can simply include it in your `dub.json`:
 ```json
 "dependencies": {
-  "ddbus": "~>1.0.0"
+  "ddbus": "~>2.0.0"
 }
 ```
 
@@ -62,6 +62,9 @@ Setting read only properties results in a thrown `DBusException`.
 You can register a delegate into a `MessageRouter` and a main loop in order to handle messages.
 After that you can request a name so that other DBus clients can connect to your program.
 
+You can return a `Tuple!(args)` to return multiple values (multiple out values in XML) or
+return a `Variant!DBusAny` to support returning any dynamic value.
+
 ```d
 import ddbus;
 MessageRouter router = new MessageRouter();
@@ -90,8 +93,7 @@ bool gotem = requestName(conn, "ca.thume.ddbus.test");
 simpleMainLoop(conn);
 ```
 
-Note that `ddbus` currently only supports a simple event loop that is really only suitable for apps that don't do
-anything except respond to DBus messages. Other threads handling other things concurrently may or may not work with it. See the todo section for notes on potential `vibe.d` compatibility.
+See the Concurrent Updates section for details how to implement this in a custom main loop.
 
 ## Thin(ish) Wrapper
 
@@ -134,11 +136,36 @@ you can import the others if you want lower level control.
 Nothing is hidden so if `ddbus` doesn't provide something you can simply import `c_lib` and use the pointers
 contained in the thin wrapper structs to do it yourself.
 
+# Concurrent Updates
+
+If you want to use the DBus connection concurrently with some other features
+or library like a GUI or vibe.d you can do so by placing this code in the update/main loop:
+
+```d
+// initialize Connection conn; somewhere
+// on update:
+if (!conn.tick)
+  return;
+```
+
+Or in vibe.d:
+
+```d
+runTask({
+  import vibe.core.core : yield;
+
+  while (conn.tick)
+    yield(); // Or sleep(1.msecs);
+});
+```
+
+It would be better to watch a file descriptor asynchronously in the event loop instead of checking on a timer, but that hasn't been implemented yet, see Todo.
+
 # Todo
 
 `ddbus` should be complete for everyday use but is missing some fanciness that it easily could and should have:
 
-- [vibe.d](http://vibed.org/) event loop compatibility so that calls don't block everything and more importantly, it is possible to write apps that have a DBus server and can do other things concurrently, like a GUI.
+- Support for adding file descriptors to event loops like vibe.d so that it only wakes up when messages arrive and not on a timer.
 - Marshaling of DBus path and file descriptor objects
 - Better efficiency in some places, particularly the object wrapping allocates tons of delegates for every method.
 
