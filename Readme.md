@@ -1,5 +1,8 @@
 # ddbus
 
+<a href="https://code.dlang.org/packages/ddbus" title="Go to ddbus"><img src="https://img.shields.io/dub/v/ddbus.svg" alt="Dub version"></a>
+<a href="https://code.dlang.org/packages/ddbus" title="Go to ddbus"><img src="https://img.shields.io/dub/dt/ddbus.svg" alt="Dub downloads"></a
+
 A [dbus](http://www.freedesktop.org/wiki/Software/dbus/) library for the [D programming language](http://dlang.org).
 
 Provides fancy and convenient highly templated methods that automagically serialize and deserialize things into DBus types so that calling DBus methods is almost as easy as calling local ones.
@@ -18,7 +21,7 @@ Before using, you will need to have the DBus C library installed on your compute
 `ddbus` is available on [DUB](http://code.dlang.org/packages/ddbus) so you can simply include it in your `dub.json`:
 ```json
 "dependencies": {
-  "ddbus": "~>2.0.0"
+  "ddbus": "~>2.1.0"
 }
 ```
 
