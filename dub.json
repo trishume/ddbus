@@ -1,12 +1,12 @@
 {
 	"name": "ddbus",
 	"description": "A DBus library for D",
-  "homepage": "http://github.com/trishume/ddbus",
-	"copyright": "Copyright © 2015, Tristan Hume",
+  "homepage": "https://github.com/trishume/ddbus",
+	"copyright": "Copyright © 2017, Tristan Hume",
   "license": "MIT",
   "authors": ["Tristan Hume"],
   "lflags": ["-ldbus-1"],
 	"dependencies": {
-      "dunit": "~>1.0.10"
+      "dunit": "~>1.0.14"
 	}
 }

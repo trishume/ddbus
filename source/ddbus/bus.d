@@ -31,6 +31,12 @@ void simpleMainLoop(Connection conn) {
   while(dbus_connection_read_write_dispatch(conn.conn, -1)) {} // empty loop body
 }
 
+/// Single tick in the DBus connection which can be used for
+/// concurrent updates.
+bool tick(Connection conn) {
+  return cast(bool) dbus_connection_read_write_dispatch(conn.conn, 0);
+}
+
 unittest {
   import dunit.toolkit;
   Connection conn = connectToBus();
