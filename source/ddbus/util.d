@@ -59,11 +59,13 @@ template canDBus(T) {
   } else static if(isTuple!T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
-    enum canDBus = canDBus!(ElementType!T);
+    static if(is(ElementType!T == DictionaryEntry!(K, V), K, V)) {
+      enum canDBus = basicDBus!K && canDBus!V;
+    } else {
+      enum canDBus = canDBus!(ElementType!T);
+    }
   } else static if(isAssociativeArray!T) {
-    enum canDBus = canDBus!(KeyType!T) && canDBus!(ValueType!T);
-  } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
-    enum canDBus = canDBus!K && canDBus!V;
+    enum canDBus = basicDBus!(KeyType!T) && canDBus!(ValueType!T);
   } else {
     enum canDBus = false;
   }
@@ -163,7 +165,7 @@ unittest {
   typeSig!(Tuple!(byte)[][]).assertEqual("aa(y)");
   // dictionaries
   typeSig!(int[string]).assertEqual("a{si}");
-  typeSig!(DictionaryEntry!(string, int)).assertEqual("{si}");
+  typeSig!(DictionaryEntry!(string, int)[]).assertEqual("a{si}");
   // multiple arguments
   typeSigAll!(int,bool).assertEqual("ib");
   // type codes
