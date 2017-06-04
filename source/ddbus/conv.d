@@ -14,6 +14,9 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
     static if(is(T == string)) {
       immutable(char)* cStr = arg.toStringz();
       dbus_message_iter_append_basic(iter,typeCode!T,&cStr);
+    } else static if(is(T == ObjectPath)) {
+      immutable(char)* cStr = arg.toString().toStringz();
+      dbus_message_iter_append_basic(iter,typeCode!T,&cStr);
     } else static if(is(T==bool)) {
       dbus_bool_t longerBool = arg; // dbus bools are ints
       dbus_message_iter_append_basic(iter,typeCode!T,&longerBool);
@@ -71,6 +74,8 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
         dbus_message_iter_open_container(iter, 'v', sig.ptr, sub);
       if(val.type == 's') {
         buildIter(sub, val.str);
+      } else if(val.type == 'o') {
+        buildIter(sub, val.obj);
       } else if(val.type == 'b') {
         buildIter(sub,val.boolean);
       } else if(dbus_type_is_basic(val.type)) {
@@ -136,10 +141,14 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   } else static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
     assert(dbus_message_iter_get_arg_type(iter) == typeCode!T());
   }
-  static if(is(T==string)) {
+  static if(is(T==string) || is(T==ObjectPath)) {
     const(char)* cStr;
     dbus_message_iter_get_basic(iter, &cStr);
-    ret = cStr.fromStringz().idup; // copy string
+    string str = cStr.fromStringz().idup; // copy string
+    static if(is(T==string))
+      ret = str;
+    else
+      ret = ObjectPath(str);
   } else static if(is(T==bool)) {
     dbus_bool_t longerBool;
     dbus_message_iter_get_basic(iter, &longerBool);
@@ -182,6 +191,9 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     ret.explicitVariant = false;
     if(ret.type == 's') {
       ret.str = readIter!string(iter);
+      return ret;
+    } else if(ret.type == 'o') {
+      ret.obj = readIter!ObjectPath(iter);
       return ret;
     } else if(ret.type == 'b') {
       ret.boolean = readIter!bool(iter);
