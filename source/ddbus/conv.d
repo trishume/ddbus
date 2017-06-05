@@ -41,7 +41,7 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       }
       DBusMessageIter subStore;
       DBusMessageIter* sub = &subStore;
-      char[] sig = [cast(char) val.type];
+      const(char)[] sig = [ cast(char) val.type ];
       if(val.type == 'a')
         sig ~= val.signature;
       else if(val.type == 'r')
