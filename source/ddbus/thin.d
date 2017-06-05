@@ -35,7 +35,7 @@ struct DBusAny {
   /// DBus type of the value (never 'v'), see typeSig!T
   int type;
   /// Child signature for Arrays & Tuples
-  char[] signature;
+  const(char)[] signature;
   /// If true, this value will get serialized as variant value, otherwise it is serialized like it wasn't in a DBusAny wrapper.
   /// Same functionality as Variant!T but with dynamic types if true.
   bool explicitVariant;
@@ -73,7 +73,7 @@ struct DBusAny {
   }
 
   /// Manually creates a DBusAny object using a type, signature and implicit specifier.
-  this(int type, char[] signature, bool explicit) {
+  this(int type, const(char)[] signature, bool explicit) {
     this.type = type;
     this.signature = signature;
     this.explicitVariant = explicit;
@@ -150,7 +150,7 @@ struct DBusAny {
       this.type = 'a';
       static assert(!is(ElementType!T == DBusAny), "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
       static assert(typeSig!(ElementType!T) != "y");
-      this.signature = typeSig!(ElementType!T).dup;
+      this.signature = typeSig!(ElementType!T);
       this.explicitVariant = false;
       foreach(elem; value)
         array ~= DBusAny(elem);
@@ -378,10 +378,10 @@ unittest {
   test(variant([1, 2, 3]), set!"array"(DBusAny('a', ['i'], true), [DBusAny(1), DBusAny(2), DBusAny(3)]));
 
   test(tuple("a", 4, [1, 2]), set!"tuple"(DBusAny('r', "(siai)".dup, false), [DBusAny("a"), DBusAny(4), DBusAny([1, 2])]));
-  test(tuple("a", variant(4), variant([1, 2])), set!"tuple"(DBusAny('r', "(svv)".dup, false), [DBusAny("a"), DBusAny(variant(4)), DBusAny(variant([1, 2]))]));
+  test(tuple("a", variant(4), variant([1, 2])), set!"tuple"(DBusAny('r', "(svv)", false), [DBusAny("a"), DBusAny(variant(4)), DBusAny(variant([1, 2]))]));
 
-  test(["a": "b"], set!"array"(DBusAny('a', "{ss}".dup, false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny("a"), DBusAny("b")))]));
-  test([variant("a"): 4], set!"array"(DBusAny('a', "{vi}".dup, false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny(variant("a")), DBusAny(4)))]));
+  test(["a": "b"], set!"array"(DBusAny('a', "{ss}", false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny("a"), DBusAny("b")))]));
+  test([variant("a"): 4], set!"array"(DBusAny('a', "{vi}", false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny(variant("a")), DBusAny(4)))]));
 }
 
 /// Marks the data as variant on serialization
