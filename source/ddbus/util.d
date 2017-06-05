@@ -143,8 +143,10 @@ string[] typeSigArr(TS...)() if(allCanDBus!TS) {
 }
 
 int typeCode(T)() if(canDBus!T) {
-  string sig = typeSig!T();
-  return sig[0];
+  static if (isTuple!T)
+    return 'r';
+  else
+    return typeSig!T()[0];
 }
 
 unittest {
