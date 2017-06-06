@@ -171,6 +171,7 @@ unittest {
   // type codes
   typeCode!int().assertEqual(cast(int)('i'));
   typeCode!bool().assertEqual(cast(int)('b'));
+  typeCode!(Tuple!(int, string))().assertEqual(cast(int)('r'));
   // ctfe-capable
   static string sig = typeSig!ulong();
   sig.assertEqual("t");
