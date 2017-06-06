@@ -143,8 +143,10 @@ string[] typeSigArr(TS...)() if(allCanDBus!TS) {
 }
 
 int typeCode(T)() if(canDBus!T) {
-  string sig = typeSig!T();
-  return sig[0];
+  static if (isTuple!T)
+    return 'r';
+  else
+    return typeSig!T()[0];
 }
 
 unittest {
@@ -169,6 +171,7 @@ unittest {
   // type codes
   typeCode!int().assertEqual(cast(int)('i'));
   typeCode!bool().assertEqual(cast(int)('b'));
+  typeCode!(Tuple!(int, string))().assertEqual(cast(int)('r'));
   // ctfe-capable
   static string sig = typeSig!ulong();
   sig.assertEqual("t");
