@@ -112,13 +112,18 @@ string typeSig(T)() if(canDBus!T) {
     } 
     sig ~= ")";
     return sig;
-  } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
-    return '{' ~ typeSig!K ~ typeSig!V ~ '}';
   } else static if(isInputRange!T) {
     return "a" ~ typeSig!(ElementType!T)();
   } else static if(isAssociativeArray!T) {
     return "a{" ~ typeSig!(KeyType!T) ~ typeSig!(ValueType!T) ~ "}";
   }
+}
+
+string typeSig(T)() if(isInstanceOf!(DictionaryEntry, T)) {
+  static if(is(T == DictionaryEntry!(K, V), K, V)) // need to get K and V somehow
+    return "{" ~ typeSig!K ~ typeSig!V ~ '}';
+  else
+    static assert (false, "DictionaryEntry always has a key type and value type, right?");
 }
 
 string[] typeSigReturn(T)() if(canDBus!T) {
@@ -147,6 +152,10 @@ string[] typeSigArr(TS...)() if(allCanDBus!TS) {
 int typeCode(T)() if(canDBus!T) {
   string sig = typeSig!T();
   return sig[0];
+}
+
+int typeCode(T)() if(isInstanceOf!(DictionaryEntry, T) && canDBus!(T[])) {
+  return 'e';
 }
 
 unittest {
