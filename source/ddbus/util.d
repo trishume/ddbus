@@ -120,10 +120,9 @@ string typeSig(T)() if(canDBus!T) {
 }
 
 string typeSig(T)() if(isInstanceOf!(DictionaryEntry, T)) {
-  static if(is(T == DictionaryEntry!(K, V), K, V)) // need to get K and V somehow
-    return "{" ~ typeSig!K ~ typeSig!V ~ '}';
-  else
-    static assert (false, "DictionaryEntry always has a key type and value type, right?");
+  alias typeof(T.key) K;
+  alias typeof(T.value) V;
+  return "{" ~ typeSig!K ~ typeSig!V ~ '}';
 }
 
 string[] typeSigReturn(T)() if(canDBus!T) {
