@@ -27,11 +27,29 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       const(char)* subSig = (typeSig!(ElementType!T)()).toStringz();
       dbus_message_iter_open_container(iter, 'a', subSig, &sub);
       foreach(x; arg) {
-        buildIter(&sub, x);
+        static if(isInstanceOf!(DictionaryEntry, typeof(x))) {
+          DBusMessageIter entry;
+          dbus_message_iter_open_container(&sub, 'e', null, &entry);
+          buildIter(&entry, x.key);
+          buildIter(&entry, x.value);
+          dbus_message_iter_close_container(&sub, &entry);
+        } else {
+          buildIter(&sub, x);
+        }
       }
       dbus_message_iter_close_container(iter, &sub);
     } else static if(isAssociativeArray!T) {
-      buildIter(iter, arg.byDictionaryEntries);
+      DBusMessageIter sub;
+      const(char)* subSig = typeSig!T[1..$].toStringz();
+      dbus_message_iter_open_container(iter, 'a', subSig, &sub);
+      foreach(k, v; arg) {
+        DBusMessageIter entry;
+        dbus_message_iter_open_container(&sub, 'e', null, &entry);
+        buildIter(&entry, k);
+        buildIter(&entry, v);
+        dbus_message_iter_close_container(&sub, &entry);
+      }
+      dbus_message_iter_close_container(iter, &sub);
     } else static if(is(T == DBusAny) || is(T == Variant!DBusAny)) {
       static if(is(T == Variant!DBusAny)) {
         auto val = arg.data;
@@ -88,12 +106,6 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       dbus_message_iter_open_container(iter, 'v', subSig, &sub);
       buildIter(&sub, arg.data);
       dbus_message_iter_close_container(iter, &sub);
-    } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
-      DBusMessageIter sub;
-      dbus_message_iter_open_container(iter, 'e', null, &sub);
-      buildIter(&sub, arg.key);
-      buildIter(&sub, arg.value);
-      dbus_message_iter_close_container(iter, &sub);
     } else static if(basicDBus!T) {
       dbus_message_iter_append_basic(iter,typeCode!T,&arg);
     }
@@ -136,17 +148,19 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     readIterTuple!T(&sub, ret);
-  } else static if(is(T == DictionaryEntry!(K, V), K, V)) {
-    DBusMessageIter sub;
-    dbus_message_iter_recurse(iter, &sub);
-    ret.key = readIter!K(&sub);
-    ret.value = readIter!V(&sub);
   } else static if(is(T t : U[], U)) {
     assert(dbus_message_iter_get_element_type(iter) == typeCode!U);
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     while(dbus_message_iter_get_arg_type(&sub) != 0) {
-      ret ~= readIter!U(&sub);
+      static if(is(U == DictionaryEntry!(K,V), K, V)) {
+        DBusMessageIter entry;
+        dbus_message_iter_recurse(&sub, &entry);
+        ret ~= U(readIter!K(&entry), readIter!V(&entry));
+        dbus_message_iter_next(&sub);
+      } else {
+        ret ~= readIter!U(&sub);
+      }
     }
   } else static if(isVariant!T) {
     DBusMessageIter sub;
@@ -156,8 +170,12 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     while(dbus_message_iter_get_arg_type(&sub) != 0) {
-      auto entry = readIter!(DictionaryEntry!(KeyType!T, ValueType!T))(&sub);
-      ret[entry.key] = entry.value;
+      DBusMessageIter entry;
+      dbus_message_iter_recurse(&sub, &entry);
+      auto k = readIter!(KeyType!T)(&entry);
+      auto v = readIter!(ValueType!T)(&entry);
+      ret[k] = v;
+      dbus_message_iter_next(&sub);
     }
   } else static if(is(T == DBusAny)) {
     ret.type = dbus_message_iter_get_arg_type(iter);
@@ -251,7 +269,15 @@ unittest {
   readIter!double(&iter).assertEqual(5.9);
   readIter!(int[])(&iter).assertEqual([6,5]);
   readIter!(Tuple!(double,int,string[][],bool[],Variant!(int[])))(&iter).assertEqual(tuple(6.2,4,[["lol"]],emptyB,var([4,2])));
+
+  // There are two ways to read a dictionary, so duplicate the iterator to test both.
+  auto iter2 = iter;
   readIter!(string[string])(&iter).assertEqual(["hello": "world"]);
+  auto dict = readIter!(DictionaryEntry!(string,string)[])(&iter2);
+  dict.length.assertEqual(1);
+  dict[0].key.assertEqual("hello");
+  dict[0].value.assertEqual("world");
+
   readIter!DBusAny(&iter).assertEqual(anyVar);
   readIter!(Variant!DBusAny)(&iter).assertEqual(complexVar);
 }
