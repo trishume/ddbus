@@ -42,6 +42,10 @@ struct ObjectPath {
     return _value;
   }
 
+  size_t toHash() const pure nothrow @trusted {
+    return hashOf(_value);
+  }
+
   bool opEquals(const ObjectPath b) const {
     return _value == b._value;
   }
