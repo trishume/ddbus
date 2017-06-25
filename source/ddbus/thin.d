@@ -56,6 +56,17 @@ struct ObjectPath {
   }
 }
 
+unittest {
+  import dunit.toolkit;
+
+  ObjectPath("some.invalid/object_path").assertThrow();
+  ObjectPath("/path/with/TrailingSlash/").assertThrow();
+  string path = "/org/freedesktop/DBus";
+  auto obj = ObjectPath(path);
+  obj.toString().assertEqual(path);
+  obj.toHash().assertEqual(path.hashOf);
+}
+
 /// Structure allowing typeless parameters
 struct DBusAny {
   /// DBus type of the value (never 'v'), see typeSig!T
