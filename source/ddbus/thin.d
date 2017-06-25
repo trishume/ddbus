@@ -46,7 +46,7 @@ struct ObjectPath {
     return hashOf(_value);
   }
 
-  bool opEquals(const ObjectPath b) const {
+  bool opEquals(ref const typeof(this) b) const pure nothrow @safe {
     return _value == b._value;
   }
 
