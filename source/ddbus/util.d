@@ -44,7 +44,8 @@ template allCanDBus(TS...) {
 template basicDBus(T) {
   static if(is(T == byte) || is(T == short) || is (T == ushort) || is (T == int)
             || is (T == uint) || is (T == long) || is (T == ulong)
-            || is (T == double) || is (T == string) || is(T == bool)) {
+            || is (T == double) || is (T == string) || is(T == bool)
+            || is (T == ObjectPath)) {
     enum basicDBus = true;
   } else {
     enum basicDBus = false;
@@ -101,6 +102,8 @@ string typeSig(T)() if(canDBus!T) {
     return "d";
   } else static if(is(T == string)) {
     return "s";
+  } else static if(is(T == ObjectPath)) {
+    return "o";
   } else static if(isVariant!T) {
     return "v";
   } else static if(is(T == DBusAny)) {

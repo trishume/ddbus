@@ -30,6 +30,43 @@ T wrapErrors(T)(T delegate(DBusError *err) del) {
   return ret;
 }
 
+struct ObjectPath {
+  private string _value;
+
+  this(string objPath) {
+    enforce(_isValid(objPath));
+    _value = objPath;
+  }
+
+  string toString() const {
+    return _value;
+  }
+
+  size_t toHash() const pure nothrow @trusted {
+    return hashOf(_value);
+  }
+
+  bool opEquals(ref const typeof(this) b) const pure nothrow @safe {
+    return _value == b._value;
+  }
+
+  private static bool _isValid(string objPath) {
+    import std.regex : matchFirst, ctRegex;
+    return cast(bool) objPath.matchFirst(ctRegex!("^((/[0-9A-Za-z_]+)+|/)$"));
+  }
+}
+
+unittest {
+  import dunit.toolkit;
+
+  ObjectPath("some.invalid/object_path").assertThrow();
+  ObjectPath("/path/with/TrailingSlash/").assertThrow();
+  string path = "/org/freedesktop/DBus";
+  auto obj = ObjectPath(path);
+  obj.toString().assertEqual(path);
+  obj.toHash().assertEqual(path.hashOf);
+}
+
 /// Structure allowing typeless parameters
 struct DBusAny {
   /// DBus type of the value (never 'v'), see typeSig!T
@@ -62,6 +99,8 @@ struct DBusAny {
     string str;
     ///
     bool boolean;
+    ///
+    ObjectPath obj;
     ///
     DBusAny[] array;
     ///
@@ -112,6 +151,9 @@ struct DBusAny {
     } else static if(is(T == bool)) {
       this(typeCode!bool, null, false);
       boolean = cast(bool) value;
+    } else static if(is(T == ObjectPath)) {
+      this(typeCode!ObjectPath, null, false);
+      obj = value;
     } else static if(is(T == Variant!R, R)) {
       static if(is(R == DBusAny)) {
         type = value.data.type;
@@ -207,6 +249,9 @@ struct DBusAny {
     case typeCode!string:
       valueStr = '"' ~ str ~ '"';
       break;
+    case typeCode!ObjectPath:
+      valueStr = '"' ~ obj.to!string ~ '"';
+      break;
     case typeCode!bool:
       valueStr = boolean ? "true" : "false";
       break;
@@ -285,6 +330,13 @@ struct DBusAny {
     } else static if(isSomeString!T) {
       if(type == 's')
         return str.to!T;
+      else if(type == 'o')
+        return obj.toString();
+      else
+        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
+    } else static if(is(T == ObjectPath)) {
+      if(type == 'o')
+        return obj;
       else
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
     } else static if(isDynamicArray!T) {
@@ -332,6 +384,8 @@ struct DBusAny {
       return tuple == b.tuple;
     else if(type == 's')
       return str == b.str;
+    else if(type == 'o')
+      return obj == b.obj;
     else if(type == 'e')
       return entry == b.entry || (entry && b.entry && *entry == *b.entry);
     else
