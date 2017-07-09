@@ -35,3 +35,32 @@ class DBusException : Exception {
   }
 }
 
+/++
+  Thrown when the signature of a message does not match the requested types.
++/
+class TypeMismatchException : Exception {
+  package this(
+    int expectedType,
+    int actualType,
+    string file = __FILE__,
+    size_t line = __LINE__,
+    Throwable next = null
+  ) pure nothrow @safe {
+    _expectedType = expectedType;
+    _actualType = actualType;
+    super("The type of value at the current position in the message does not match the type of value to be read."
+      ~ " Expected: " ~ cast(char) expectedType ~ ", Got: " ~ cast(char) actualType);
+  }
+
+  int expectedType() @property pure const nothrow @nogc {
+    return _expectedType;
+  }
+
+  int actualType() @property pure const nothrow @nogc {
+    return _actualType;
+  }
+
+  private:
+  int _expectedType;
+  int _actualType;
+}

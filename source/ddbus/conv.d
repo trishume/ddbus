@@ -1,8 +1,10 @@
 module ddbus.conv;
 
 import ddbus.c_lib;
+import ddbus.exception : TypeMismatchException;
 import ddbus.util;
 import ddbus.thin;
+import std.exception : enforce;
 import std.string;
 import std.typecons;
 import std.range;
@@ -134,12 +136,10 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
       return ret;
     }
   }
-  static if(isTuple!T) {
-    assert(dbus_message_iter_get_arg_type(iter) == 'r');
-  } else static if(is(T == DictionaryEntry!(K1, V1), K1, V1)) {
-    assert(dbus_message_iter_get_arg_type(iter) == 'e');
-  } else static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
-    assert(dbus_message_iter_get_arg_type(iter) == typeCode!T());
+  static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
+    auto argType = dbus_message_iter_get_arg_type(iter);
+    enforce(argType == typeCode!T(),
+      new TypeMismatchException(argType, typeCode!T()));
   }
   static if(is(T==string) || is(T==ObjectPath)) {
     const(char)* cStr;
@@ -272,6 +272,11 @@ unittest {
   auto args = tuple(5,true,"wow",var(5.9),[6,5],tuple(6.2,4,[["lol"]],emptyB,var([4,2])),map,anyVar,complexVar);
   msg.build(args.expand);
   msg.signature().assertEqual("ibsvai(diaasabv)a{ss}tv");
+
+  msg.read!string().assertThrow!TypeMismatchException();
+  msg.readTuple!(Tuple!(int, bool, double)).assertThrow!TypeMismatchException();
+  msg.readTuple!(Tuple!(int, bool, string, double)).assertEqual(tuple(5,true,"wow", 5.9));
+
   msg.readTuple!(typeof(args))().assertEqual(args);
   DBusMessageIter iter;
   dbus_message_iter_init(msg.msg, &iter);
