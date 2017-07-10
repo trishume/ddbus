@@ -12,23 +12,8 @@ import std.conv;
 import std.range;
 import std.algorithm;
 
-class DBusException : Exception {
-  this(DBusError *err) {
-    super(err.message.fromStringz().idup);
-  }
-}
-
-T wrapErrors(T)(T delegate(DBusError *err) del) {
-  DBusError error;
-  dbus_error_init(&error);
-  T ret = del(&error);
-  if(dbus_error_is_set(&error)) {
-    auto ex = new DBusException(&error);
-    dbus_error_free(&error);
-    throw ex;
-  }
-  return ret;
-}
+// This import is public for backwards compatibility
+public import ddbus.exception : wrapErrors, DBusException;
 
 struct ObjectPath {
   private string _value;
