@@ -11,7 +11,7 @@ It currently supports:
 
 - Calling methods
 - Creating wrapper objects for DBus interfaces
-- Seamlessly converting too and from D types
+- Seamlessly converting to and from D types
 - Handling method calls and signals (includes introspection support)
 
 # Installation
@@ -130,6 +130,7 @@ msg.readTuple!(typeof(args))().assertEqual(args);
 - `simple`: simpler wrappers around other functionality.
 - `conv`: low level type marshaling methods.
 - `util`: templates for working with D type marshaling like `canDBus!T`.
+- `exception`: exception classes
 - `c_lib`: a D translation of the DBus C headers.
 
 Importing `ddbus` publicly imports the `thin`,`router`,`bus` and `simple` modules.
@@ -169,7 +170,7 @@ It would be better to watch a file descriptor asynchronously in the event loop i
 `ddbus` should be complete for everyday use but is missing some fanciness that it easily could and should have:
 
 - Support for adding file descriptors to event loops like vibe.d so that it only wakes up when messages arrive and not on a timer.
-- Marshaling of DBus path and file descriptor objects
+- Marshaling of file descriptor objects
 - Better efficiency in some places, particularly the object wrapping allocates tons of delegates for every method.
 
 Pull requests are welcome, the codebase is pretty small and other than the template metaprogramming for type marshaling is fairly straightforward.
