@@ -132,7 +132,24 @@ T readIter(T)(DBusMessageIter *iter) if (is(T == enum)) {
   return cast(T) value;
 }
 
-T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && canDBus!T) {
+T readIter(T)(DBusMessageIter *iter) if (isInstanceOf!(BitFlags, T)) {
+  import std.algorithm.iteration : fold;
+
+  alias TemplateArgsOf!T[0] E;
+  alias OriginalType!E B;
+
+  B mask = only(EnumMembers!E).fold!((a, b) => a | b);
+
+  B value = readIter!B(iter);
+  enforce(
+    !(value & ~mask),
+    new InvalidValueException(value, T.stringof)
+  );
+
+  return T(cast(E) value);
+}
+
+T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
   T ret;
 
   static if(!isVariant!T || is(T == Variant!DBusAny)) {
@@ -331,6 +348,10 @@ unittest {
   readIter!E(&iter).assertEqual(E.c);
   readIter!E(&iter).assertThrow!InvalidValueException();
 
+  iter2 = iter;
   readIter!F(&iter).assertThrow!InvalidValueException();
+  readIter!(BitFlags!F)(&iter2).assertEqual(BitFlags!F(F.x, F.z));
+
   readIter!F(&iter).assertThrow!InvalidValueException();
+  readIter!(BitFlags!F)(&iter2).assertThrow!InvalidValueException();
 }
