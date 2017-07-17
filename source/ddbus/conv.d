@@ -139,7 +139,7 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
     auto argType = dbus_message_iter_get_arg_type(iter);
     enforce(argType == typeCode!T(),
-      new TypeMismatchException(argType, typeCode!T()));
+      new TypeMismatchException(typeCode!T(), argType));
   }
   static if(is(T==string) || is(T==ObjectPath)) {
     const(char)* cStr;
