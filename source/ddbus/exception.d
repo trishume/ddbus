@@ -64,3 +64,29 @@ class TypeMismatchException : Exception {
   int _expectedType;
   int _actualType;
 }
+
+/++
+  Thrown during type conversion between DBus types and D types when a value is
+  encountered that can not be represented in the target type.
+
+  This exception should not normally be thrown except when dealing with D types
+  that have a constrained value set, such as Enums.
++/
+class InvalidValueException : Exception {
+  package this(Source)(
+    Source value,
+    string targetType,
+    string file = __FILE__,
+    size_t line = __LINE__,
+    Throwable next = null
+  ) {
+    import std.conv : to;
+
+    static if(__traits(compiles, value.to!string))
+      string valueString = value.to!string;
+    else
+      string valueString = "(unprintable)";
+
+    super("Value " ~ valueString ~ " cannot be represented in type " ~ targetType);
+  }
+}

@@ -1,7 +1,7 @@
 module ddbus.conv;
 
 import ddbus.c_lib;
-import ddbus.exception : TypeMismatchException;
+import ddbus.exception : InvalidValueException, TypeMismatchException;
 import ddbus.util;
 import ddbus.thin;
 import std.exception : enforce;
@@ -119,8 +119,39 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
   }
 }
 
-T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
+T readIter(T)(DBusMessageIter *iter) if (is(T == enum)) {
+  import std.algorithm.searching : canFind;
+
+  alias OriginalType!T B;
+
+  B value = readIter!B(iter);
+  enforce(
+    only(EnumMembers!T).canFind(value),
+    new InvalidValueException(value, T.stringof)
+  );
+  return cast(T) value;
+}
+
+T readIter(T)(DBusMessageIter *iter) if (isInstanceOf!(BitFlags, T)) {
+  import std.algorithm.iteration : fold;
+
+  alias TemplateArgsOf!T[0] E;
+  alias OriginalType!E B;
+
+  B mask = only(EnumMembers!E).fold!((a, b) => a | b);
+
+  B value = readIter!B(iter);
+  enforce(
+    !(value & ~mask),
+    new InvalidValueException(value, T.stringof)
+  );
+
+  return T(cast(E) value);
+}
+
+T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
   T ret;
+
   static if(!isVariant!T || is(T == Variant!DBusAny)) {
     if(dbus_message_iter_get_arg_type(iter) == 'v') {
       DBusMessageIter sub;
@@ -237,6 +268,7 @@ T readIter(T)(DBusMessageIter *iter) if (canDBus!T) {
   } else static if(basicDBus!T) {
     dbus_message_iter_get_basic(iter, &ret);
   }
+
   dbus_message_iter_next(iter);
   return ret;
 }
@@ -269,6 +301,7 @@ unittest {
   complexVar.data.type.assertEqual('a');
   complexVar.data.signature.assertEqual("{sv}".dup);
   tupleMember.signature.assertEqual("(vviai(vi)a{ss})");
+
   auto args = tuple(5,true,"wow",var(5.9),[6,5],tuple(6.2,4,[["lol"]],emptyB,var([4,2])),map,anyVar,complexVar);
   msg.build(args.expand);
   msg.signature().assertEqual("ibsvai(diaasabv)a{ss}tv");
@@ -297,4 +330,28 @@ unittest {
 
   readIter!DBusAny(&iter).assertEqual(anyVar);
   readIter!(Variant!DBusAny)(&iter).assertEqual(complexVar);
+}
+
+unittest {
+  import dunit.toolkit;
+  import ddbus.thin;
+
+  enum E : int { a, b, c }
+  enum F : uint { x = 1, y = 2, z = 4 }
+
+  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth2");
+  msg.build(E.c, 4, 5u, 8u);
+
+  DBusMessageIter iter, iter2;
+  dbus_message_iter_init(msg.msg, &iter);
+
+  readIter!E(&iter).assertEqual(E.c);
+  readIter!E(&iter).assertThrow!InvalidValueException();
+
+  iter2 = iter;
+  readIter!F(&iter).assertThrow!InvalidValueException();
+  readIter!(BitFlags!F)(&iter2).assertEqual(BitFlags!F(F.x, F.z));
+
+  readIter!F(&iter).assertThrow!InvalidValueException();
+  readIter!(BitFlags!F)(&iter2).assertThrow!InvalidValueException();
 }

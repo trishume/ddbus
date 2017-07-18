@@ -47,6 +47,11 @@ template basicDBus(T) {
             || is (T == double) || is (T == string) || is(T == bool)
             || is (T == ObjectPath)) {
     enum basicDBus = true;
+  } else static if(is(T B == enum)) {
+    enum basicDBus = basicDBus!B;
+  } else static if(isInstanceOf!(BitFlags, T)) {
+    alias TemplateArgsOf!T[0] E;
+    enum basicDBus = basicDBus!E;
   } else {
     enum basicDBus = false;
   }
@@ -71,6 +76,7 @@ template canDBus(T) {
     enum canDBus = false;
   }
 }
+
 unittest {
   import dunit.toolkit;
   (canDBus!int).assertTrue();
@@ -106,6 +112,11 @@ string typeSig(T)() if(canDBus!T) {
     return "o";
   } else static if(isVariant!T) {
     return "v";
+  } else static if(is(T B == enum)) {
+    return typeSig!B;
+  } else static if(isInstanceOf!(BitFlags, T)) {
+    alias TemplateArgsOf!T[0] E;
+    return typeSig!E;
   } else static if(is(T == DBusAny)) {
     static assert(false, "Cannot determine type signature of DBusAny. Change to Variant!DBusAny if a variant was desired.");
   } else static if(isTuple!T) {
@@ -169,6 +180,14 @@ unittest {
   typeSig!bool().assertEqual("b");
   typeSig!string().assertEqual("s");
   typeSig!(Variant!int)().assertEqual("v");
+  // enums
+  enum E : byte { a, b, c }
+  typeSig!E().assertEqual(typeSig!byte());
+  enum U : string { One = "One", Two = "Two" }
+  typeSig!U().assertEqual(typeSig!string());
+  // bit flags
+  enum F : uint { a = 1, b = 2, c = 4 }
+  typeSig!(BitFlags!F)().assertEqual(typeSig!uint());
   // structs
   typeSig!(Tuple!(int,string,string)).assertEqual("(iss)");
   typeSig!(Tuple!(int,string,Variant!int,Tuple!(int,"k",double,"x"))).assertEqual("(isv(id))");
