@@ -113,6 +113,11 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       dbus_message_iter_open_container(iter, 'v', subSig, &sub);
       buildIter(&sub, arg.data);
       dbus_message_iter_close_container(iter, &sub);
+    } else static if(is(T == struct)) {
+      DBusMessageIter sub;
+      dbus_message_iter_open_container(iter, 'r', null, &sub);
+      buildIter(&sub, arg.tupleof);
+      dbus_message_iter_close_container(iter, &sub);
     } else static if(basicDBus!T) {
       dbus_message_iter_append_basic(iter,typeCode!T,&arg);
     }
@@ -265,6 +270,10 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
       ret.entry.key = readIter!DBusAny(&sub);
       ret.entry.value = readIter!DBusAny(&sub);
     }
+  } else static if(is(T == struct)) {
+    DBusMessageIter sub;
+    dbus_message_iter_recurse(iter, &sub);
+    readIterStruct!T(&sub, ret);
   } else static if(basicDBus!T) {
     dbus_message_iter_get_basic(iter, &ret);
   }
@@ -276,6 +285,13 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
 void readIterTuple(Tup)(DBusMessageIter *iter, ref Tup tuple) if(isTuple!Tup && allCanDBus!(Tup.Types)) {
   foreach(index, T; Tup.Types) {
     tuple[index] = readIter!T(iter);
+  }
+}
+
+void readIterStruct(S)(DBusMessageIter *iter, ref S s) if(is(S == struct) && allCanDBus!(Fields!S)) {
+  alias FieldNameTuple!S names;
+  foreach(index, T; Fields!S) {
+    __traits(getMember, s, names[index]) = readIter!T(iter);
   }
 }
 
@@ -355,3 +371,22 @@ unittest {
   readIter!F(&iter).assertThrow!InvalidValueException();
   readIter!(BitFlags!F)(&iter2).assertThrow!InvalidValueException();
 }
+
+unittest {
+  import dunit.toolkit;
+  import ddbus.thin;
+
+  struct S1 { int a; double b; string s; }
+  struct S2 { Variant!int c; string d; S1 e; uint f; }
+
+  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
+
+  enum testStruct = S2(variant(5), "blah", S1(-7, 63.5, "test"), 16);
+  msg.build(testStruct);
+
+  DBusMessageIter iter;
+  dbus_message_iter_init(msg.msg, &iter);
+
+  readIter!S2(&iter).assertEqual(testStruct);
+}
+

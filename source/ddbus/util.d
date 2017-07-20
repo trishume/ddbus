@@ -72,6 +72,8 @@ template canDBus(T) {
     }
   } else static if(isAssociativeArray!T) {
     enum canDBus = basicDBus!(KeyType!T) && canDBus!(ValueType!T);
+  } else static if(is(T == struct) && !isInstanceOf!(DictionaryEntry, T)) {
+    enum canDBus = allCanDBus!(Fields!T);
   } else {
     enum canDBus = false;
   }
@@ -130,6 +132,13 @@ string typeSig(T)() if(canDBus!T) {
     return "a" ~ typeSig!(ElementType!T)();
   } else static if(isAssociativeArray!T) {
     return "a{" ~ typeSig!(KeyType!T) ~ typeSig!(ValueType!T) ~ "}";
+  } else static if(is(T == struct)) {
+    string sig = "(";
+    foreach(i, S; Fields!T) {
+      sig ~= typeSig!S();
+    }
+    sig ~= ")";
+    return sig;
   }
 }
 
@@ -163,10 +172,8 @@ string[] typeSigArr(TS...)() if(allCanDBus!TS) {
 }
 
 int typeCode(T)() if(canDBus!T) {
-  static if (isTuple!T)
-    return 'r';
-  else
-    return typeSig!T()[0];
+  int code = typeSig!T()[0];
+  return (code != '(') ? code : 'r';
 }
 
 int typeCode(T)() if(isInstanceOf!(DictionaryEntry, T) && canDBus!(T[])) {
@@ -188,9 +195,14 @@ unittest {
   // bit flags
   enum F : uint { a = 1, b = 2, c = 4 }
   typeSig!(BitFlags!F)().assertEqual(typeSig!uint());
-  // structs
+  // tuples (represented as structs in DBus)
   typeSig!(Tuple!(int,string,string)).assertEqual("(iss)");
   typeSig!(Tuple!(int,string,Variant!int,Tuple!(int,"k",double,"x"))).assertEqual("(isv(id))");
+  // structs
+  struct S1 { int a; double b; string s; }
+  typeSig!S1.assertEqual("(ids)");
+  struct S2 { Variant!int c; string d; S1 e; uint f; }
+  typeSig!S2.assertEqual("(vs(ids)u)");
   // arrays
   typeSig!(int[]).assertEqual("ai");
   typeSig!(Variant!int[]).assertEqual("av");
