@@ -291,7 +291,7 @@ void readIterTuple(Tup)(DBusMessageIter *iter, ref Tup tuple) if(isTuple!Tup && 
 void readIterStruct(S)(DBusMessageIter *iter, ref S s) if(is(S == struct) && allCanDBus!(Fields!S)) {
   alias FieldNameTuple!S names;
   foreach(index, T; Fields!S) {
-    __traits(getMember, s, names[index]) = readIter!T(iter);
+    s.tupleof[index] = readIter!T(iter);
   }
 }
 
