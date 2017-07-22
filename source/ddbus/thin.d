@@ -570,6 +570,19 @@ struct Connection {
   }
 }
 
+unittest {
+  import dunit.toolkit;
+
+  struct S1 { private int a; double b; string s; }
+  struct S2 { Variant!int c; string d; S1 e; uint f; }
+
+  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
+
+  enum testStruct = S2(variant(5), "blah", S1(-7, 63.5, "test"), 16);
+  msg.build(testStruct);
+  msg.read!S2().assertEqual(testStruct);
+}
+
 Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
   DBusConnection *conn = wrapErrors((err) { return dbus_bus_get(bus,err); });
   return Connection(conn);

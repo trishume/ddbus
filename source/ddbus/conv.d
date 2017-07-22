@@ -372,21 +372,3 @@ unittest {
   readIter!(BitFlags!F)(&iter2).assertThrow!InvalidValueException();
 }
 
-unittest {
-  import dunit.toolkit;
-  import ddbus.thin;
-
-  struct S1 { int a; double b; string s; }
-  struct S2 { Variant!int c; string d; S1 e; uint f; }
-
-  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
-
-  enum testStruct = S2(variant(5), "blah", S1(-7, 63.5, "test"), 16);
-  msg.build(testStruct);
-
-  DBusMessageIter iter;
-  dbus_message_iter_init(msg.msg, &iter);
-
-  readIter!S2(&iter).assertEqual(testStruct);
-}
-
