@@ -573,14 +573,49 @@ struct Connection {
 unittest {
   import dunit.toolkit;
 
-  struct S1 { private int a; double b; string s; }
-  struct S2 { Variant!int c; string d; S1 e; uint f; }
+  struct S1 {
+    private int a;
+    private @(Yes.DBusMarshal) double b;
+    string s;
+  }
+
+  @dbusMarshaling(MarshalingFlag.manualOnly)
+  struct S2 {
+    int h, i;
+    @(Yes.DBusMarshal) int j, k;
+  }
+
+  @dbusMarshaling(MarshalingFlag.includePrivateFields)
+  struct S3 {
+    private Variant!int c;
+    string d;
+    S1 e;
+    S2 f;
+    @(No.DBusMarshal) uint g;
+  }
 
   Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
 
-  enum testStruct = S2(variant(5), "blah", S1(-7, 63.5, "test"), 16);
+  enum testStruct = S3(
+    variant(5), "blah",
+    S1(-7, 63.5, "test"),
+    S2(84, -123, 78, 432),
+    16
+  );
+
   msg.build(testStruct);
-  msg.read!S2().assertEqual(testStruct);
+
+  // Non-marshaled fields should appear as freshly initialized
+  enum expectedResult = S3(
+    variant(5), "blah",
+    S1(int.init, 63.5, "test"),
+    S2(int.init, int.init, 78, 432),
+    uint.init
+  );
+
+  msg.read!S3().assertEqual(expectedResult);
+
+
 }
 
 Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
