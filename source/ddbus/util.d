@@ -4,6 +4,7 @@ import ddbus.thin;
 import std.typecons;
 import std.range;
 import std.traits;
+import std.variant : VariantN;
 
 struct DictionaryEntry(K, V) {
   K key;
@@ -62,6 +63,9 @@ template canDBus(T) {
     enum canDBus = true;
   } else static if(isVariant!T) {
     enum canDBus = canDBus!(VariantType!T);
+  } else static if(isInstanceOf!(VariantN, T)) {
+    // Phobos-style variants are supported if limited to DBus compatible types.
+    enum canDBus = (T.AllowedTypes.length > 0) && allCanDBus!(T.AllowedTypes);
   } else static if(isTuple!T) {
     enum canDBus = allCanDBus!(T.Types);
   } else static if(isInputRange!T) {
@@ -112,7 +116,7 @@ string typeSig(T)() if(canDBus!T) {
     return "s";
   } else static if(is(T == ObjectPath)) {
     return "o";
-  } else static if(isVariant!T) {
+  } else static if(isVariant!T || isInstanceOf!(VariantN, T)) {
     return "v";
   } else static if(is(T B == enum)) {
     return typeSig!B;
@@ -212,6 +216,9 @@ unittest {
   typeSig!(DictionaryEntry!(string, int)[]).assertEqual("a{si}");
   // multiple arguments
   typeSigAll!(int,bool).assertEqual("ib");
+  // Phobos-style variants
+  canDBus!(std.variant.Variant).assertFalse();
+  typeSig!(std.variant.Algebraic!(int, double, string)).assertEqual("v");
   // type codes
   typeCode!int().assertEqual(cast(int)('i'));
   typeCode!bool().assertEqual(cast(int)('b'));
