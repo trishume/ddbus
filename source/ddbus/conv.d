@@ -122,7 +122,7 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       }
       if(val.explicitVariant)
         dbus_message_iter_close_container(iter, sub);
-    } else static if(isVariant!T) {
+    } else static if(isInstanceOf!(Variant, T)) {
       DBusMessageIter sub;
       const(char)* subSig = typeSig!(VariantType!T).toStringz();
       dbus_message_iter_open_container(iter, 'v', subSig, &sub);
@@ -188,7 +188,7 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
   auto argType = dbus_message_iter_get_arg_type(iter);
   T ret;
 
-  static if(!isVariant!T || is(T == Variant!DBusAny)) {
+  static if(!isInstanceOf!(Variant, T) || is(T == Variant!DBusAny)) {
     if(argType == 'v') {
       DBusMessageIter sub;
       dbus_message_iter_recurse(iter, &sub);
@@ -242,7 +242,7 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
         ret ~= readIter!U(&sub);
       }
     }
-  } else static if(isVariant!T) {
+  } else static if(isInstanceOf!(Variant, T)) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     ret.data = readIter!(VariantType!T)(&sub);

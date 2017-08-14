@@ -17,6 +17,15 @@ auto byDictionaryEntries(K, V)(V[K] aa) {
   return aa.byKeyValue.map!(pair => DictionaryEntry!(K, V)(pair.key, pair.value));
 }
 
+/+
+  Predicate template indicating whether T is an instance of ddbus.thin.Variant.
+
+  Deprecated:
+    This template used to be undocumented and user code should not depend on it.
+    Its meaning became unclear when support for Phobos-style variants was added.
+    It seemed best to remove it at that point.
++/
+deprecated("Use std.traits.isInstanceOf instead.")
 template isVariant(T) {
   static if(isBasicType!T || isInputRange!T) {
     enum isVariant = false;
@@ -61,7 +70,7 @@ template basicDBus(T) {
 template canDBus(T) {
   static if(basicDBus!T || is(T == DBusAny)) {
     enum canDBus = true;
-  } else static if(isVariant!T) {
+  } else static if(isInstanceOf!(Variant, T)) {
     enum canDBus = canDBus!(VariantType!T);
   } else static if(isInstanceOf!(VariantN, T)) {
     // Phobos-style variants are supported if limited to DBus compatible types.
@@ -116,7 +125,7 @@ string typeSig(T)() if(canDBus!T) {
     return "s";
   } else static if(is(T == ObjectPath)) {
     return "o";
-  } else static if(isVariant!T || isInstanceOf!(VariantN, T)) {
+  } else static if(isInstanceOf!(Variant, T) || isInstanceOf!(VariantN, T)) {
     return "v";
   } else static if(is(T B == enum)) {
     return typeSig!B;
