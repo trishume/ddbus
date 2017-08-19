@@ -173,7 +173,7 @@ T readIter(T)(DBusMessageIter *iter) if (isInstanceOf!(BitFlags, T)) {
   alias TemplateArgsOf!T[0] E;
   alias OriginalType!E B;
 
-  B mask = only(EnumMembers!E).fold!((a, b) => a | b);
+  B mask = only(EnumMembers!E).fold!((a, b) => cast(B) (a | b));
 
   B value = readIter!B(iter);
   enforce(
