@@ -194,6 +194,10 @@ void registerRouter(Connection conn, MessageRouter router) {
 
 unittest{
   import dunit.toolkit;
+
+  import std.typecons : BitFlags;
+  import std.variant : Algebraic;
+
   auto router = new MessageRouter();
   // set up test messages
   MessagePattern patt = MessagePattern("/root","ca.thume.test","test");
@@ -209,6 +213,24 @@ unittest{
   patt = MessagePattern("/troll","ca.thume.tester","wow");
   router.setHandler!(void)(patt,{return;});
 
+  patt = MessagePattern("/root/fancy","ca.thume.tester","crazyTest");
+  enum F : ushort { a = 1, b = 8, c = 16 }
+  struct S { byte b; ulong ul; F f; }
+  router.setHandler!(int)(patt, (Algebraic!(ushort, BitFlags!F, S) v) {
+    if (v.type is typeid(ushort) || v.type is typeid(BitFlags!F)) {
+      return v.coerce!int;
+    } else if (v.type is typeid(S)) {
+      auto s = v.get!S;
+      final switch (s.f) {
+        case F.a: return s.b;
+        case F.b: return cast(int) s.ul;
+        case F.c: return cast(int) s.ul + s.b;
+      }
+    }
+
+    assert(false);
+  });
+
   static assert(!__traits(compiles, {
     patt = MessagePattern("/root/bar","ca.thume.tester","lolwut");
     router.setHandler!(void, DBusAny)(patt,(DBusAny wrongUsage){return;});
@@ -216,10 +238,13 @@ unittest{
 
   // TODO: these tests rely on nondeterministic hash map ordering
   static string introspectResult = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
-<node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="bar"/><node name="foo"/><node name="wat"/></node>`;
+<node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="bar"/><node name="fancy"/><node name="foo"/><node name="wat"/></node>`;
   router.introspectXML("/root").assertEqual(introspectResult);
   static string introspectResult2 = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/root/foo"><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="v" direction="in"/><arg type="s" direction="out"/><arg type="s" direction="out"/><arg type="i" direction="out"/></method></interface></node>`;
   router.introspectXML("/root/foo").assertEqual(introspectResult2);
+  static string introspectResult3 = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/root/fancy"><interface name="ca.thume.tester"><method name="crazyTest"><arg type="v" direction="in"/><arg type="i" direction="out"/></method></interface></node>`;
+  router.introspectXML("/root/fancy").assertEqual(introspectResult3);
   router.introspectXML("/").assertEndsWith(`<node name="/"><node name="root"/><node name="troll"/></node>`);
 }

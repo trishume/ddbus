@@ -10,6 +10,7 @@ import std.string;
 import std.typecons;
 import std.range;
 import std.traits;
+import std.variant : VariantN;
 
 void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
   foreach(index, arg; args) {
@@ -56,6 +57,19 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
         dbus_message_iter_close_container(&sub, &entry);
       }
       dbus_message_iter_close_container(iter, &sub);
+    } else static if(isInstanceOf!(VariantN, T)) {
+      enforce(arg.hasValue,
+        new InvalidValueException(arg, "dbus:" ~ cast(char) typeCode!T));
+
+      DBusMessageIter sub;
+      foreach(AT; T.AllowedTypes) {
+        if (arg.peek!AT) {
+          dbus_message_iter_open_container(iter, 'v', typeSig!AT.ptr, &sub);
+          buildIter(&sub, arg.get!AT);
+          dbus_message_iter_close_container(iter, &sub);
+          break;
+        }
+      }
     } else static if(is(T == DBusAny) || is(T == Variant!DBusAny)) {
       static if(is(T == Variant!DBusAny)) {
         auto val = arg.data;
@@ -108,7 +122,7 @@ void buildIter(TS...)(DBusMessageIter *iter, TS args) if(allCanDBus!TS) {
       }
       if(val.explicitVariant)
         dbus_message_iter_close_container(iter, sub);
-    } else static if(isVariant!T) {
+    } else static if(isInstanceOf!(Variant, T)) {
       DBusMessageIter sub;
       const(char)* subSig = typeSig!(VariantType!T).toStringz();
       dbus_message_iter_open_container(iter, 'v', subSig, &sub);
@@ -159,7 +173,7 @@ T readIter(T)(DBusMessageIter *iter) if (isInstanceOf!(BitFlags, T)) {
   alias TemplateArgsOf!T[0] E;
   alias OriginalType!E B;
 
-  B mask = only(EnumMembers!E).fold!((a, b) => a | b);
+  B mask = only(EnumMembers!E).fold!((a, b) => cast(B) (a | b));
 
   B value = readIter!B(iter);
   enforce(
@@ -171,10 +185,11 @@ T readIter(T)(DBusMessageIter *iter) if (isInstanceOf!(BitFlags, T)) {
 }
 
 T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
+  auto argType = dbus_message_iter_get_arg_type(iter);
   T ret;
 
-  static if(!isVariant!T || is(T == Variant!DBusAny)) {
-    if(dbus_message_iter_get_arg_type(iter) == 'v') {
+  static if(!isInstanceOf!(Variant, T) || is(T == Variant!DBusAny)) {
+    if(argType == 'v') {
       DBusMessageIter sub;
       dbus_message_iter_recurse(iter, &sub);
       static if(is(T == Variant!DBusAny)) {
@@ -188,8 +203,12 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
       return ret;
     }
   }
-  static if(!is(T == DBusAny) && !is(T == Variant!DBusAny)) {
-    auto argType = dbus_message_iter_get_arg_type(iter);
+
+  static if(
+    !is(T == DBusAny)
+    && !is(T == Variant!DBusAny)
+    && !isInstanceOf!(VariantN, T)
+  ) {
     enforce(argType == typeCode!T(),
       new TypeMismatchException(typeCode!T(), argType));
   }
@@ -223,10 +242,29 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
         ret ~= readIter!U(&sub);
       }
     }
-  } else static if(isVariant!T) {
+  } else static if(isInstanceOf!(Variant, T)) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     ret.data = readIter!(VariantType!T)(&sub);
+  } else static if(isInstanceOf!(VariantN, T)) {
+    scope const(char)[] argSig =
+      dbus_message_iter_get_signature(iter).fromStringz();
+    scope(exit)
+      dbus_free(cast(void*) argSig.ptr);
+
+    foreach(AT; T.AllowedTypes) {
+      // We have to compare the full signature here, not just the typecode.
+      // Otherwise, in case of container types, we might select the wrong one.
+      // We would then be calling an incorrect instance of readIter, which would
+      // probably throw a TypeMismatchException.
+      if (typeSig!AT == argSig) {
+        ret = readIter!AT(iter);
+        break;
+      }
+    }
+
+    // If no value is in ret, apparently none of the types matched.
+    enforce(ret.hasValue, new TypeMismatchException(typeCode!T, argType));
   } else static if(isAssociativeArray!T) {
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
@@ -239,7 +277,7 @@ T readIter(T)(DBusMessageIter *iter) if (!is(T == enum) && !isInstanceOf!(BitFla
       dbus_message_iter_next(&sub);
     }
   } else static if(is(T == DBusAny)) {
-    ret.type = dbus_message_iter_get_arg_type(iter);
+    ret.type = argType;
     ret.explicitVariant = false;
     if(ret.type == 's') {
       ret.str = readIter!string(iter);
@@ -428,11 +466,16 @@ unittest {
   import dunit.toolkit;
   import ddbus.thin;
 
+  import std.variant : Algebraic;
+
   enum E : int { a, b, c }
   enum F : uint { x = 1, y = 2, z = 4 }
+  alias V = Algebraic!(byte, short, int, long, string);
 
   Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth2");
-  msg.build(E.c, 4, 5u, 8u);
+  V v1 = "hello from variant";
+  V v2 = cast(short) 345;
+  msg.build(E.c, 4, 5u, 8u, v1, v2);
 
   DBusMessageIter iter, iter2;
   dbus_message_iter_init(msg.msg, &iter);
@@ -446,5 +489,8 @@ unittest {
 
   readIter!F(&iter).assertThrow!InvalidValueException();
   readIter!(BitFlags!F)(&iter2).assertThrow!InvalidValueException();
+
+  readIter!V(&iter).assertEqual(v1);
+  readIter!short(&iter).assertEqual(v2.get!short);
 }
 

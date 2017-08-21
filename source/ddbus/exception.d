@@ -48,15 +48,20 @@ class TypeMismatchException : Exception {
   ) pure nothrow @safe {
     _expectedType = expectedType;
     _actualType = actualType;
-    super("The type of value at the current position in the message does not match the type of value to be read."
-      ~ " Expected: " ~ cast(char) expectedType ~ ", Got: " ~ cast(char) actualType);
+    if (expectedType == 'v') {
+      super("The type of value at the current position in the message is incompatible to the target variant type."
+        ~ " Type code of the value: " ~ cast(char) actualType);
+    } else {
+      super("The type of value at the current position in the message does not match the type of value to be read."
+        ~ " Expected: " ~ cast(char) expectedType ~ ", Got: " ~ cast(char) actualType);
+    }
   }
 
-  int expectedType() @property pure const nothrow @nogc {
+  int expectedType() @property pure const nothrow @safe @nogc {
     return _expectedType;
   }
 
-  int actualType() @property pure const nothrow @nogc {
+  int actualType() @property pure const nothrow @safe @nogc {
     return _actualType;
   }
 
