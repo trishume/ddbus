@@ -249,7 +249,7 @@ struct DBusAny {
         valueStr = '[' ~ array.map!(a => a.toString).join(", ") ~ ']';
       break;
     case 'r':
-      valueStr = '(' ~ array.map!(a => a.toString).join(", ") ~ ')';
+      valueStr = '(' ~ tuple.map!(a => a.toString).join(", ") ~ ')';
       break;
     case 'e':
       valueStr = entry.key.toString ~ ": " ~ entry.value.toString;
