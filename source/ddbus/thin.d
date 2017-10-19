@@ -18,8 +18,8 @@ public import ddbus.exception : wrapErrors, DBusException;
 struct ObjectPath {
   private string _value;
 
-  this(string objPath) {
-    enforce(_isValid(objPath));
+  this(string objPath) @safe {
+    enforce(isValid(objPath));
     _value = objPath;
   }
 
@@ -27,17 +27,62 @@ struct ObjectPath {
     return _value;
   }
 
-  size_t toHash() const pure nothrow @trusted {
+  /// Returns the string representation of this ObjectPath.
+  string value() const pure @nogc nothrow @safe {
+    return _value;
+  }
+
+  size_t toHash() const pure @nogc nothrow @trusted {
     return hashOf(_value);
   }
 
-  bool opEquals(ref const typeof(this) b) const pure nothrow @safe {
+  bool opEquals(ref const typeof(this) b) const pure @nogc nothrow @safe {
     return _value == b._value;
   }
 
-  private static bool _isValid(string objPath) {
-    import std.regex : matchFirst, ctRegex;
-    return cast(bool) objPath.matchFirst(ctRegex!("^((/[0-9A-Za-z_]+)+|/)$"));
+  ObjectPath opBinary(string op : "~")(string rhs) const pure @safe {
+    return opBinary!"~"(ObjectPath(rhs));
+  }
+
+  ObjectPath opBinary(string op : "~")(ObjectPath rhs) const pure @safe {
+    if (!_value.length || _value[$ - 1] != '/') {
+      ObjectPath ret;
+      // Is safe if both sides were safe and isValid enforces a starting /
+      ret._value = _value ~ rhs._value;
+      return ret;
+    } else {
+      ObjectPath ret;
+      ret._value = _value[0 .. $ - 1] ~ rhs._value;
+      return ret;
+    }
+  }
+
+  void opOpAssign(string op : "~")(string rhs) pure @safe {
+    _value = opBinary!"~"(rhs)._value;
+  }
+
+  void opOpAssign(string op : "~")(ObjectPath rhs) pure @safe {
+    _value = opBinary!"~"(rhs)._value;
+  }
+
+  /// Returns: false for empty strings or strings that don't match the pattern `(/[0-9A-Za-z_]+)+|/`
+  static bool isValid(string objPath) pure @nogc nothrow @safe {
+    import std.ascii : isAlphaNum;
+
+    if (!objPath.length)
+      return false;
+    if (objPath == "/")
+      return true;
+    if (objPath[0] != '/' || objPath[$ - 1] == '/')
+      return false;
+    // .representation to avoid unicode exceptions -> @nogc & nothrow
+    return objPath.representation.splitter('/').drop(1)
+        .all!(a =>
+          a.length &&
+          a.all!(c =>
+            c.isAlphaNum || c == '_'
+          )
+        );
   }
 }
 
@@ -46,9 +91,10 @@ unittest {
 
   ObjectPath("some.invalid/object_path").assertThrow();
   ObjectPath("/path/with/TrailingSlash/").assertThrow();
+  ObjectPath("/path/without/TrailingSlash").assertNotThrown();
   string path = "/org/freedesktop/DBus";
   auto obj = ObjectPath(path);
-  obj.toString().assertEqual(path);
+  obj.value.assertEqual(path);
   obj.toHash().assertEqual(path.hashOf);
 }
 
