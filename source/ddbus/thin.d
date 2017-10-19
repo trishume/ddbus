@@ -16,9 +16,8 @@ import std.algorithm;
 public import ddbus.exception : wrapErrors, DBusException;
 
 struct ObjectPath {
-  private string _value;
-
-  this(string objPath) {
+  /// Creates and validates a ObjectPath from a string
+  this(string objPath) @safe {
     enforce(_isValid(objPath));
     _value = objPath;
   }
@@ -26,6 +25,19 @@ struct ObjectPath {
   string toString() const {
     return _value;
   }
+
+  /// Returns the string representation of this ObjectPath
+  string value() const pure nothrow @safe {
+    return _value;
+  }
+
+  /// Sets and validates the string representation of this ObjectPath
+  string value(string newVal) @safe {
+    enforce(_isValid(newVal));
+    return _value = newVal;
+  }
+
+  alias value this;
 
   size_t toHash() const pure nothrow @trusted {
     return hashOf(_value);
@@ -35,7 +47,11 @@ struct ObjectPath {
     return _value == b._value;
   }
 
-  private static bool _isValid(string objPath) {
+  bool opEquals(const typeof(this) b) const pure nothrow @safe {
+    return _value == b._value;
+  }
+
+  private static bool _isValid(string objPath) @trusted {
     import std.regex : matchFirst, ctRegex;
     return cast(bool) objPath.matchFirst(ctRegex!("^((/[0-9A-Za-z_]+)+|/)$"));
   }
