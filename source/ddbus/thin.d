@@ -18,7 +18,7 @@ public import ddbus.exception : wrapErrors, DBusException;
 struct ObjectPath {
   private string _value;
 
-  this(string objPath) @safe {
+  this(string objPath) pure @safe {
     enforce(isValid(objPath));
     _value = objPath;
   }
@@ -41,20 +41,26 @@ struct ObjectPath {
   }
 
   ObjectPath opBinary(string op : "~")(string rhs) const pure @safe {
-    return opBinary!"~"(ObjectPath(rhs));
+    if (!rhs.startsWith("/"))
+      return opBinary!"~"(ObjectPath("/" ~ rhs));
+    else
+      return opBinary!"~"(ObjectPath(rhs));
   }
 
-  ObjectPath opBinary(string op : "~")(ObjectPath rhs) const pure @safe {
-    if (!_value.length || _value[$ - 1] != '/') {
-      ObjectPath ret;
-      // Is safe if both sides were safe and isValid enforces a starting /
+  ObjectPath opBinary(string op : "~")(ObjectPath rhs) const pure @safe
+  in {
+    assert(ObjectPath.isValid(_value) && ObjectPath.isValid(rhs._value));
+  } out (v) {
+    assert(ObjectPath.isValid(v._value));
+  } body {
+    ObjectPath ret;
+
+    if (_value == "/")
+      ret._value = rhs._value;
+    else
       ret._value = _value ~ rhs._value;
-      return ret;
-    } else {
-      ObjectPath ret;
-      ret._value = _value[0 .. $ - 1] ~ rhs._value;
-      return ret;
-    }
+
+    return ret;
   }
 
   void opOpAssign(string op : "~")(string rhs) pure @safe {
@@ -96,6 +102,19 @@ unittest {
   auto obj = ObjectPath(path);
   obj.value.assertEqual(path);
   obj.toHash().assertEqual(path.hashOf);
+}
+
+unittest {
+  import dunit.toolkit;
+
+  ObjectPath a = ObjectPath("/org/freedesktop");
+  a.assertEqual(ObjectPath("/org/freedesktop"));
+  a ~= ObjectPath("/UPower");
+  a.assertEqual(ObjectPath("/org/freedesktop/UPower"));
+  a ~= "Device";
+  a.assertEqual(ObjectPath("/org/freedesktop/UPower/Device"));
+  (a ~ "0").assertEqual(ObjectPath("/org/freedesktop/UPower/Device/0"));
+  a.assertEqual(ObjectPath("/org/freedesktop/UPower/Device"));
 }
 
 /// Structure allowing typeless parameters
