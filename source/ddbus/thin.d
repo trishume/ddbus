@@ -8,7 +8,7 @@ import ddbus.conv;
 import ddbus.exception : TypeMismatchException;
 import ddbus.util;
 
-import std.meta : staticIndexOf;
+import std.meta : ApplyRight, Filter, staticIndexOf;
 import std.string;
 import std.typecons;
 import std.exception;
@@ -419,7 +419,7 @@ struct DBusAny {
   }
 
   /// If the value is an array of DictionaryEntries this will return a HashMap
-  DBusAny[DBusAny] toAA() {
+  deprecated("Please use to!(V[K])") DBusAny[DBusAny] toAA() {
     enforce(type == 'a' && signature && signature[0] == '{');
     DBusAny[DBusAny] aa;
 
@@ -451,8 +451,19 @@ struct DBusAny {
     }
   }
 
-  /// Converts a basic type, a tuple or an array to the D type with type checking. Tuples can get converted to an array too.
-  T to(T)() {
+  /++
+    Converts a basic type, a tuple or an array to the D type with type checking.
+
+    Tuples can be converted to an array of DBusAny, but not to any other array.
+   +/
+  T to(T)() @property const pure {
+    // Just use `get` if possible
+    static if (canDBus!T && __traits(compiles, get!T)) {
+      if (this.typeSig == .typeSig!T)
+        return get!T;
+    }
+
+    // If we get here, we need some type conversion
     static if (is(T == Variant!R, R)) {
       static if (is(R == DBusAny)) {
         auto v = to!R;
@@ -463,92 +474,87 @@ struct DBusAny {
       }
     } else static if (is(T == DBusAny)) {
       return this;
-    } else static if (isIntegral!T || isFloatingPoint!T) {
-      switch (type) {
-      case typeCode!byte:
-        return cast(T) int8;
-      case typeCode!short:
-        return cast(T) int16;
-      case typeCode!ushort:
-        return cast(T) uint16;
-      case typeCode!int:
-        return cast(T) int32;
-      case typeCode!uint:
-        return cast(T) uint32;
-      case typeCode!long:
-        return cast(T) int64;
-      case typeCode!ulong:
-        return cast(T) uint64;
-      case typeCode!double:
-        return cast(T) float64;
-      default:
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-    } else static if (is(T == bool)) {
-      if (type == 'b') {
-        return boolean;
-      } else {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-    } else static if (isSomeString!T) {
-      if (type == 's') {
-        return str.to!T;
-      } else if (type == 'o') {
-        return obj.toString();
-      } else {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-    } else static if (is(T == ObjectPath)) {
-      if (type == 'o') {
-        return obj;
-      } else {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-    } else static if (isDynamicArray!T) {
-      if (type != 'a' && type != 'r') {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to an array");
-      }
+    } else {
+      // In here are all static if blocks that may fall through to the throw
+      // statement at the bottom of this block.
 
-      T ret;
-      if (signature == ['y']) {
-        static if (isIntegral!(ElementType!T)) {
-          foreach (elem; binaryData) {
-            ret ~= elem.to!(ElementType!T);
+      static if (is(T == DictionaryEntry!(K, V), K, V)) {
+        if (type == 'e') {
+          static if (is(T == typeof(entry))) {
+            return entry;
+          } else {
+            return DictionaryEntry(entry.key.to!K, entry.value.to!V);
           }
         }
+      } else static if (isAssociativeArray!T) {
+        if (type == 'a' && (!array.length || array[0].type == 'e')) {
+          alias K = Unqual!(KeyType!T);
+          alias V = Unqual!(ValueType!T);
+          V[K] ret;
+
+          foreach (pair; array) {
+            assert(pair.type == 'e');
+            ret[pair.entry.key.to!K] = pair.entry.value.to!V;
+          }
+
+          return cast(T) ret;
+        }
+      } else static if (isDynamicArray!T && !isSomeString!T) {
+        alias E = Unqual!(ElementType!T);
+
+        if (typeSig == "ay") {
+          static if (is(E == ubyte) || is(E == byte)) {
+            return cast(T) binaryData.dup;
+          } else {
+            T ret;
+            ret.length = binaryData.length;
+
+            foreach (i, b; binaryData)
+              ret[i] = b;
+
+            return ret;
+          }
+        } else if (type == 'a' || (type == 'r' && is(E == DBusAny))) {
+          E[] ret;
+          ret.length = array.length;
+
+          foreach (i, elem; array)
+            ret[i] = elem.to!(ElementType!T);
+
+          return cast(T) ret;
+        }
+      } else static if (isTuple!T) {
+        if (type == 'r') {
+          T ret;
+
+          foreach (i, T; ret.Types)
+            ret[i] = tuple[i].to!T;
+
+          return ret;
+        }
       } else {
-        foreach (elem; array) {
-          ret ~= elem.to!(ElementType!T);
+        alias isPreciselyConvertible = ApplyRight!(isImplicitlyConvertible, T);
+
+        template isUnpreciselyConvertible(S) {
+          enum isUnpreciselyConvertible = !isPreciselyConvertible!S
+              && __traits(compiles, get!S.to!T);
+        }
+
+        // Try to be precise
+        foreach (B; Filter!(isPreciselyConvertible, BasicTypes)) {
+          if (type == typeCode!B)
+            return get!B;
+        }
+
+        // Try to convert
+        foreach (B; Filter!(isUnpreciselyConvertible, BasicTypes)) {
+          if (type == typeCode!B)
+            return get!B.to!T;
         }
       }
 
-      return ret;
-    } else static if (isTuple!T) {
-      if (type != 'r') {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-
-      T ret;
-      enforce(ret.Types.length == tuple.length, "Tuple length mismatch");
-      foreach (index, T; ret.Types) {
-        ret[index] = tuple[index].to!T;
-      }
-
-      return ret;
-    } else static if (isAssociativeArray!T) {
-      if (type != 'a' || !signature || signature[0] != '{') {
-        throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-      }
-
-      T ret;
-      foreach (pair; array) {
-        enforce(pair.type == 'e');
-        ret[pair.entry.key.to!(KeyType!T)] = pair.entry.value.to!(ValueType!T);
-      }
-
-      return ret;
-    } else {
-      static assert(false, "Can't convert variant to " ~ T.stringof);
+      throw new ConvException("Cannot convert from DBus type '" ~ this.typeSig ~ "' to "
+          ~ T.stringof);
     }
   }
 
