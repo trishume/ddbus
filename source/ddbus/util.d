@@ -1,9 +1,10 @@
 module ddbus.util;
 
 import ddbus.thin;
-import std.typecons;
+import std.meta : AliasSeq, staticIndexOf;
 import std.range;
 import std.traits;
+import std.typecons : BitFlags, isTuple, Tuple;
 import std.variant : VariantN;
 
 struct DictionaryEntry(K, V) {
@@ -51,11 +52,26 @@ template allCanDBus(TS...) {
   }
 }
 
+/++
+  AliasSeq of all basic types in terms of the DBus typesystem
+ +/
+package // Don't add to the API yet, 'cause I intend to move it later
+alias BasicTypes = AliasSeq!(
+  bool,
+  byte,
+  short,
+  ushort,
+  int,
+  uint,
+  long,
+  ulong,
+  double,
+  string,
+  ObjectPath
+);
+
 template basicDBus(T) {
-  static if(is(T == byte) || is(T == short) || is (T == ushort) || is (T == int)
-            || is (T == uint) || is (T == long) || is (T == ulong)
-            || is (T == double) || is (T == string) || is(T == bool)
-            || is (T == ObjectPath)) {
+  static if(staticIndexOf!(T, BasicTypes) >= 0) {
     enum basicDBus = true;
   } else static if(is(T B == enum)) {
     enum basicDBus = basicDBus!B;
