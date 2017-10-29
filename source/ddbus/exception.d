@@ -64,7 +64,7 @@ class TypeMismatchException : Exception {
     this(message, expectedType, actualType, file, line, next);
   }
 
-  package this(
+  this(
     string message,
     int expectedType,
     int actualType,
