@@ -36,7 +36,9 @@ class DBusException : Exception {
 }
 
 /++
-  Thrown when the signature of a message does not match the requested types.
+  Thrown when the signature of a message does not match the requested types or
+  when trying to get a value from a DBusAny object that does not match the type
+  of its actual value.
 +/
 class TypeMismatchException : Exception {
   package this(
@@ -46,15 +48,33 @@ class TypeMismatchException : Exception {
     size_t line = __LINE__,
     Throwable next = null
   ) pure nothrow @safe {
+    string message;
+
+    if (expectedType == 'v') {
+      message = "The type of value at the current position in the message is"
+        ~ " incompatible to the target variant type."
+        ~ " Type code of the value: '" ~ cast(char) actualType ~ '\'';
+    } else {
+      message = "The type of value at the current position in the message does"
+        ~ " not match the type of value to be read."
+        ~ " Expected: '" ~ cast(char) expectedType ~ "',"
+        ~ " Got: '" ~ cast(char) actualType ~ '\'';
+    }
+
+    this(message, expectedType, actualType, file, line, next);
+  }
+
+  package this(
+    string message,
+    int expectedType,
+    int actualType,
+    string file = __FILE__,
+    size_t line = __LINE__,
+    Throwable next = null
+  ) pure nothrow @safe {
     _expectedType = expectedType;
     _actualType = actualType;
-    if (expectedType == 'v') {
-      super("The type of value at the current position in the message is incompatible to the target variant type."
-        ~ " Type code of the value: " ~ cast(char) actualType);
-    } else {
-      super("The type of value at the current position in the message does not match the type of value to be read."
-        ~ " Expected: " ~ cast(char) expectedType ~ ", Got: " ~ cast(char) actualType);
-    }
+    super(message, file, line, next);
   }
 
   int expectedType() @property pure const nothrow @safe @nogc {

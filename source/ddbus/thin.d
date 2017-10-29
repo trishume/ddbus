@@ -3,7 +3,10 @@ module ddbus.thin;
 
 import ddbus.c_lib;
 import ddbus.conv;
+import ddbus.exception : TypeMismatchException;
 import ddbus.util;
+
+import std.meta : staticIndexOf;
 import std.string;
 import std.typecons;
 import std.exception;
@@ -57,7 +60,7 @@ struct DBusAny {
   /// DBus type of the value (never 'v'), see typeSig!T
   int type;
   /// Child signature for Arrays & Tuples
-  const(char)[] signature;
+  string signature;
   /// If true, this value will get serialized as variant value, otherwise it is serialized like it wasn't in a DBusAny wrapper.
   /// Same functionality as Variant!T but with dynamic types if true.
   bool explicitVariant;
@@ -89,7 +92,7 @@ struct DBusAny {
     ///
     DBusAny[] array;
     ///
-    DBusAny[] tuple;
+    alias tuple = array;
     ///
     DictionaryEntry!(DBusAny, DBusAny)* entry;
     ///
@@ -97,7 +100,7 @@ struct DBusAny {
   }
 
   /// Manually creates a DBusAny object using a type, signature and implicit specifier.
-  this(int type, const(char)[] signature, bool explicit) {
+  this(int type, string signature, bool explicit) {
     this.type = type;
     this.signature = signature;
     this.explicitVariant = explicit;
@@ -176,8 +179,8 @@ struct DBusAny {
     } else static if(isInputRange!T) {
       this.type = 'a';
       static assert(!is(ElementType!T == DBusAny), "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
-      static assert(typeSig!(ElementType!T) != "y");
-      this.signature = typeSig!(ElementType!T);
+      static assert(.typeSig!(ElementType!T) != "y");
+      this.signature = .typeSig!(ElementType!T);
       this.explicitVariant = false;
       foreach(elem; value)
         array ~= DBusAny(elem);
@@ -264,6 +267,66 @@ struct DBusAny {
       ~ ", " ~ valueStr ~ ")";
   }
 
+  /++
+    Returns the value stored in the DBusAny object by specifying the type.
+
+    Parameters:
+      T = The requested type. The currently stored value must match the
+        requested type exactly.
+
+    Throws:
+      TypeMismatchException if the DBus type of the current value of the
+      DBusAny object is not the same as the DBus type used to represent T.
+  +/
+  T get(T)() @property const
+    if (staticIndexOf!(T, BasicTypes) >= 0)
+  {
+    enforce(type == typeCode!T,
+      new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
+          ~ " a value of DBus type '" ~ typeSig ~ "'.", typeCode!T, type));
+
+    static if (isIntegral!T) {
+      enum memberName =
+        (isUnsigned!T ? "uint" : "int") ~ (T.sizeof << 3).to!string;
+      return __traits(getMember, this, memberName);
+    } else static if (is(T == double)) {
+      return float64;
+    } else static if (is(T == string)) {
+      return str;
+    } else static if (is(T == ObjectPath)) {
+      return obj;
+    } else static if (is(T == bool)) {
+      return boolean;
+    }
+  }
+
+  /// ditto
+  T get(T)() @property const
+    if (is(T == const(DBusAny)[]))
+  {
+    enforce((type == 'a' && signature != "y") || type == 'r',
+      new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
+          ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
+        typeCode!T, type));
+
+    return array;
+  }
+
+  /// ditto
+  T get(T)() @property const
+    if (is(T == const(ubyte)[]))
+  {
+    enforce(type == 'a' && signature == "y",
+      new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
+          ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
+        typeCode!T, type));
+
+    return binaryData;
+  }
+
   /// If the value is an array of DictionaryEntries this will return a HashMap
   DBusAny[DBusAny] toAA() {
     enforce(type == 'a' && signature && signature[0] == '{');
@@ -273,6 +336,24 @@ struct DBusAny {
       aa[val.entry.key] = val.entry.value;
     }
     return aa;
+  }
+
+  /++
+    Get the type signature of the value stored in this DBusAny object.
+   +/
+  string typeSig() @property const pure nothrow @safe
+  {
+    if (type == 'a') {
+      return "a" ~ signature;
+    } else if (type == 'r') {
+      return signature;
+    } else if (type == 'e') {
+      return () @trusted {
+        return "{" ~ entry.key.signature ~ entry.value.signature ~ "}";
+      } ();
+    } else {
+      return [ cast(char) type ];
+    }
   }
 
   /// Converts a basic type, a tuple or an array to the D type with type checking. Tuples can get converted to an array too.
