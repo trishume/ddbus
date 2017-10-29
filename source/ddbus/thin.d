@@ -468,6 +468,15 @@ unittest {
 
   void test(T)(T value, DBusAny b) {
     assertEqual(DBusAny(value), b);
+
+    static if(is(T == Variant!R, R)) {
+      static if (__traits(compiles, b.get!R))
+        assertEqual(b.get!R, value.data);
+    } else {
+      static if (__traits(compiles, b.get!T))
+        assertEqual(b.get!T, value);
+    }
+
     assertEqual(b.to!T, value);
     b.toString();
   }
