@@ -175,15 +175,24 @@ struct DBusAny {
     ubyte[] binaryData;
   }
 
-  /// Manually creates a DBusAny object using a type, signature and implicit specifier.
+  /++
+    Manually creates a DBusAny object using a type, signature and explicit
+    variant specifier.
+
+    Direct use of this constructor from user code should be avoided.
+   +/
   this(int type, string signature, bool explicit) {
     this.type = type;
     this.signature = signature;
     this.explicitVariant = explicit;
   }
 
-  /// Automatically creates a DBusAny object with fitting parameters from a D type or Variant!T.
-  /// Pass a `Variant!T` to make this an explicit variant.
+  /++
+    Automatically creates a DBusAny object with fitting parameters from a D
+    type or Variant!T.
+
+    Pass a `Variant!T` to make this an explicit variant.
+   +/
   this(T)(T value) {
     static if (is(T == byte) || is(T == ubyte)) {
       this(typeCode!byte, null, false);
