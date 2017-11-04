@@ -27,7 +27,9 @@ struct ObjectPath {
     return _value;
   }
 
-  /// Returns the string representation of this ObjectPath.
+  /++
+    Returns the string representation of this ObjectPath.
+   +/
   string value() const pure @nogc nothrow @safe {
     return _value;
   }
@@ -71,7 +73,10 @@ struct ObjectPath {
     _value = opBinary!"~"(rhs)._value;
   }
 
-  /// Returns: false for empty strings or strings that don't match the pattern `(/[0-9A-Za-z_]+)+|/`
+  /++
+    Returns: `false` for empty strings or strings that don't match the
+    pattern `(/[0-9A-Za-z_]+)+|/`.
+   +/
   static bool isValid(string objPath) pure @nogc nothrow @safe {
     import std.ascii : isAlphaNum;
 
@@ -83,12 +88,12 @@ struct ObjectPath {
       return false;
     // .representation to avoid unicode exceptions -> @nogc & nothrow
     return objPath.representation.splitter('/').drop(1)
-        .all!(a =>
-          a.length &&
-          a.all!(c =>
-            c.isAlphaNum || c == '_'
-          )
-        );
+      .all!(a =>
+        a.length &&
+        a.all!(c =>
+          c.isAlphaNum || c == '_'
+        )
+      );
   }
 }
 
