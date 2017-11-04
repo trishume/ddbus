@@ -8,6 +8,10 @@ import std.string;
 import std.traits;
 
 class PathIface {
+  this(Connection conn, string dest, ObjectPath path, string iface) {
+    this(conn, dest, path.value, iface);
+  }
+
   this(Connection conn, string dest, string path, string iface) {
     this.conn = conn;
     this.dest = dest.toStringz();
