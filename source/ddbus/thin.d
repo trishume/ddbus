@@ -654,6 +654,7 @@ unittest {
   struct S2 {
     int h, i;
     @(Yes.DBusMarshal) int j, k;
+    int *p;
   }
 
   @dbusMarshaling(MarshalingFlag.includePrivateFields)

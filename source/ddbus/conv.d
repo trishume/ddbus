@@ -7,7 +7,7 @@ import ddbus.util;
 import ddbus.thin;
 
 import std.exception : enforce;
-import std.meta: allSatisfy;
+import std.meta: allSatisfy, Filter;
 import std.string;
 import std.typecons;
 import std.range;
@@ -344,7 +344,8 @@ void readIterTuple(Tup)(DBusMessageIter *iter, ref Tup tuple) if(isTuple!Tup && 
   }
 }
 
-void readIterStruct(S)(DBusMessageIter *iter, ref S s) if(is(S == struct) && allCanDBus!(Fields!S)) {
+void readIterStruct(S)(DBusMessageIter *iter, ref S s) if(is(S == struct) && canDBus!S)
+{
   foreach(index, T; Fields!S) {
     static if (isAllowedField!(s.tupleof[index])) {
       s.tupleof[index] = readIter!T(iter);
