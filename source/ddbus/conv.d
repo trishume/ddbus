@@ -7,7 +7,7 @@ import ddbus.util;
 import ddbus.thin;
 
 import std.exception : enforce;
-import std.meta: allSatisfy, Filter;
+import std.meta: allSatisfy;
 import std.string;
 import std.typecons;
 import std.range;
