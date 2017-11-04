@@ -572,6 +572,7 @@ struct Connection {
 
 unittest {
   import dunit.toolkit;
+  import ddbus.attributes : dbusMarshaling, MarshalingFlag;
 
   struct S1 {
     private int a;
