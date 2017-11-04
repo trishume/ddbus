@@ -3,6 +3,7 @@ module ddbus.thin;
 
 import core.time : Duration;
 
+import ddbus.attributes : isAllowedField;
 import ddbus.c_lib;
 import ddbus.conv;
 import ddbus.exception : TypeMismatchException;
@@ -302,6 +303,25 @@ struct DBusAny {
       }
 
       this.signature ~= ')';
+    } else static if (is(T == struct) && canDBus!T) {
+      this.type = 'r';
+      this.signature = ['('];
+      this.explicitVariant = false;
+      foreach (index, R; Fields!T) {
+        static if (isAllowedField!(value.tupleof[index])) {
+          auto var = DBusAny(value.tupleof[index]);
+          tuple ~= var;
+          if (var.explicitVariant)
+            this.signature ~= 'v';
+          else {
+            if (var.type != 'r')
+              this.signature ~= cast(char) var.type;
+            if (var.type == 'a' || var.type == 'r')
+              this.signature ~= var.signature;
+          }
+        }
+      }
+      this.signature ~= ')';
     } else static if (isAssociativeArray!T) {
       this(value.byDictionaryEntries);
     } else {
@@ -538,6 +558,19 @@ struct DBusAny {
 
           foreach (i, T; ret.Types)
             ret[i] = tuple[i].to!T;
+
+          return ret;
+        }
+      } else static if (is(T == struct) && canDBus!T) {
+        if (type == 'r') {
+          T ret;
+          size_t j;
+
+          foreach (i, F; Fields!T) {
+            static if (isAllowedField!(ret.tupleof[i])) {
+              ret.tupleof[i] = tuple[j++].to!F;
+            }
+          }
 
           return ret;
         }
@@ -857,14 +890,16 @@ unittest {
   enum testStruct = S3(variant(5), "blah", S1(-7, 63.5, "test"), S2(84, -123,
         78, 432, &dummy), 16);
 
-  msg.build(testStruct);
-
   // Non-marshaled fields should appear as freshly initialized
   enum expectedResult = S3(variant(5), "blah", S1(int.init, 63.5, "test"),
         S2(int.init, int.init, 78, 432, null), uint.init);
 
+  // Test struct conversion in building/reading messages
+  msg.build(testStruct);
   msg.read!S3().assertEqual(expectedResult);
 
+  // Test struct conversion in DBusAny
+  DBusAny(testStruct).to!S3.assertEqual(expectedResult);
 }
 
 Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
