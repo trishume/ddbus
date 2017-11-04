@@ -86,7 +86,7 @@ template canDBus(T) {
   } else static if(isAssociativeArray!T) {
     enum canDBus = basicDBus!(KeyType!T) && canDBus!(ValueType!T);
   } else static if(is(T == struct) && !isInstanceOf!(DictionaryEntry, T)) {
-    enum canDBus = allCanDBus!(Fields!T);
+    enum canDBus = allCanDBus!(AllowedFieldTypes!T);
   } else {
     enum canDBus = false;
   }
@@ -147,7 +147,7 @@ string typeSig(T)() if(canDBus!T) {
     return "a{" ~ typeSig!(KeyType!T) ~ typeSig!(ValueType!T) ~ "}";
   } else static if(is(T == struct)) {
     string sig = "(";
-    foreach(i, S; Fields!T) {
+    foreach(i, S; AllowedFieldTypes!T) {
       sig ~= typeSig!S();
     }
     sig ~= ")";
@@ -241,3 +241,11 @@ unittest {
   sig3.assertEqual("iss"); 
 }
 
+private template AllowedFieldTypes(S) if (is(S == struct)) {
+  import ddbus.attributes : isAllowedField;
+  import std.meta : Filter, staticMap;
+  static alias TypeOf(alias sym) = typeof(sym);
+
+  alias AllowedFieldTypes =
+    staticMap!(TypeOf, Filter!(isAllowedField, S.tupleof));
+}
