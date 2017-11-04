@@ -668,10 +668,12 @@ unittest {
 
   Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
 
+  __gshared int dummy;
+
   enum testStruct = S3(
     variant(5), "blah",
     S1(-7, 63.5, "test"),
-    S2(84, -123, 78, 432),
+    S2(84, -123, 78, 432, &dummy),
     16
   );
 
@@ -681,7 +683,7 @@ unittest {
   enum expectedResult = S3(
     variant(5), "blah",
     S1(int.init, 63.5, "test"),
-    S2(int.init, int.init, 78, 432),
+    S2(int.init, int.init, 78, 432, null),
     uint.init
   );
 
