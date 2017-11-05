@@ -268,42 +268,47 @@ struct DBusAny {
   }
 
   /++
-    Returns the value stored in the DBusAny object by specifying the type.
+    Get the value stored in the DBusAny object.
 
     Parameters:
       T = The requested type. The currently stored value must match the
         requested type exactly.
+
+    Returns:
+      The current value of the DBusAny object.
 
     Throws:
       TypeMismatchException if the DBus type of the current value of the
       DBusAny object is not the same as the DBus type used to represent T.
   +/
   T get(T)() @property const
-    if (staticIndexOf!(T, BasicTypes) >= 0)
+    if(staticIndexOf!(T, BasicTypes) >= 0)
   {
     enforce(type == typeCode!T,
       new TypeMismatchException(
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
           ~ " a value of DBus type '" ~ typeSig ~ "'.", typeCode!T, type));
 
-    static if (isIntegral!T) {
+    static if(isIntegral!T) {
       enum memberName =
-        (isUnsigned!T ? "uint" : "int") ~ (T.sizeof << 3).to!string;
+        (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
       return __traits(getMember, this, memberName);
-    } else static if (is(T == double)) {
+    } else static if(is(T == double)) {
       return float64;
-    } else static if (is(T == string)) {
+    } else static if(is(T == string)) {
       return str;
-    } else static if (is(T == ObjectPath)) {
+    } else static if(is(T == ObjectPath)) {
       return obj;
-    } else static if (is(T == bool)) {
+    } else static if(is(T == bool)) {
       return boolean;
+    } else {
+      static assert(false);
     }
   }
 
   /// ditto
   T get(T)() @property const
-    if (is(T == const(DBusAny)[]))
+    if(is(T == const(DBusAny)[]))
   {
     enforce((type == 'a' && signature != "y") || type == 'r',
       new TypeMismatchException(
@@ -343,11 +348,11 @@ struct DBusAny {
    +/
   string typeSig() @property const pure nothrow @safe
   {
-    if (type == 'a') {
+    if(type == 'a') {
       return "a" ~ signature;
-    } else if (type == 'r') {
+    } else if(type == 'r') {
       return signature;
-    } else if (type == 'e') {
+    } else if(type == 'e') {
       return () @trusted {
         return "{" ~ entry.key.signature ~ entry.value.signature ~ "}";
       } ();
@@ -470,10 +475,10 @@ unittest {
     assertEqual(DBusAny(value), b);
 
     static if(is(T == Variant!R, R)) {
-      static if (__traits(compiles, b.get!R))
+      static if(__traits(compiles, b.get!R))
         assertEqual(b.get!R, value.data);
     } else {
-      static if (__traits(compiles, b.get!T))
+      static if(__traits(compiles, b.get!T))
         assertEqual(b.get!T, value);
     }
 
