@@ -344,7 +344,10 @@ struct DBusAny {
   }
 
   /++
-    Get the type signature of the value stored in this DBusAny object.
+    Get the DBus type signature of the value stored in the DBusAny object.
+
+    Returns:
+      The type signature of the value stored in this DBusAny object.
    +/
   string typeSig() @property const pure nothrow @safe
   {
