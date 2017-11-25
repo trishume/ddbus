@@ -639,17 +639,6 @@ unittest {
 
   void test(T)(T value, DBusAny b) {
     assertEqual(DBusAny(value), b);
-
-    static if (is(T == Variant!R, R)) {
-      static if (__traits(compiles, b.get!R)) {
-        assertEqual(b.get!R, value.data);
-      }
-    } else {
-      static if (__traits(compiles, b.get!T)) {
-        assertEqual(b.get!T, value);
-      }
-    }
-
     assertEqual(b.to!T, value);
     b.toString();
   }
@@ -661,7 +650,10 @@ unittest {
   test(cast(uint) 184, set!"uint32"(DBusAny('u', null, false), cast(uint) 184));
   test(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
   test(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
+  test(1.84, set!"float64"(DBusAny('d', null, false), 1.84));
   test(true, set!"boolean"(DBusAny('b', null, false), true));
+  test("abc", set!"str"(DBusAny('s', null, false), "abc"));
+  test(ObjectPath("/foo/Bar"), set!"obj"(DBusAny('o', null, false), ObjectPath("/foo/Bar")));
   test(cast(ubyte[])[1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false),
       cast(ubyte[])[1, 2, 3]));
 
@@ -672,7 +664,11 @@ unittest {
   test(variant(cast(uint) 184), set!"uint32"(DBusAny('u', null, true), cast(uint) 184));
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
+  test(variant(1.84), set!"float64"(DBusAny('d', null, true), 1.84));
   test(variant(true), set!"boolean"(DBusAny('b', null, true), true));
+  test(variant("abc"), set!"str"(DBusAny('s', null, true), "abc"));
+  test(variant(ObjectPath("/foo/Bar")), set!"obj"(DBusAny('o', null, true),
+      ObjectPath("/foo/Bar")));
   test(variant(cast(ubyte[])[1, 2, 3]), set!"binaryData"(DBusAny('a', ['y'],
       true), cast(ubyte[])[1, 2, 3]));
 
