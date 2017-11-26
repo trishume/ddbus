@@ -26,12 +26,10 @@ auto byDictionaryEntries(K, V)(V[K] aa) {
     Its meaning became unclear when support for Phobos-style variants was added.
     It seemed best to remove it at that point.
 +/
-deprecated("Use std.traits.isInstanceOf instead.")
-template isVariant(T) {
-  static if(isBasicType!T || isInputRange!T) {
+deprecated("Use std.traits.isInstanceOf instead.") template isVariant(T) {
+  static if (isBasicType!T || isInputRange!T) {
     enum isVariant = false;
-  } else static if(__traits(compiles, TemplateOf!T) 
-                && __traits(isSame, TemplateOf!T, Variant)) {
+  } else static if (__traits(compiles, TemplateOf!T) && __traits(isSame, TemplateOf!T, Variant)) {
     enum isVariant = true;
   } else {
     enum isVariant = false;
@@ -44,38 +42,27 @@ template VariantType(T) {
 
 template allCanDBus(TS...) {
   static if (TS.length == 0) {
-    enum allCanDBus = true; 
-  } else static if(!canDBus!(TS[0])) {
+    enum allCanDBus = true;
+  } else static if (!canDBus!(TS[0])) {
     enum allCanDBus = false;
   } else {
-    enum allCanDBus = allCanDBus!(TS[1..$]);
+    enum allCanDBus = allCanDBus!(TS[1 .. $]);
   }
 }
 
 /++
   AliasSeq of all basic types in terms of the DBus typesystem
  +/
-package // Don't add to the API yet, 'cause I intend to move it later
-alias BasicTypes = AliasSeq!(
-  bool,
-  byte,
-  short,
-  ushort,
-  int,
-  uint,
-  long,
-  ulong,
-  double,
-  string,
-  ObjectPath
-);
+package  // Don't add to the API yet, 'cause I intend to move it later
+alias BasicTypes = AliasSeq!(bool, byte, short, ushort, int, uint, long, ulong,
+    double, string, ObjectPath);
 
 template basicDBus(T) {
-  static if(staticIndexOf!(T, BasicTypes) >= 0) {
+  static if (staticIndexOf!(T, BasicTypes) >= 0) {
     enum basicDBus = true;
-  } else static if(is(T B == enum)) {
+  } else static if (is(T B == enum)) {
     enum basicDBus = basicDBus!B;
-  } else static if(isInstanceOf!(BitFlags, T)) {
+  } else static if (isInstanceOf!(BitFlags, T)) {
     alias TemplateArgsOf!T[0] E;
     enum basicDBus = basicDBus!E;
   } else {
@@ -84,24 +71,24 @@ template basicDBus(T) {
 }
 
 template canDBus(T) {
-  static if(basicDBus!T || is(T == DBusAny)) {
+  static if (basicDBus!T || is(T == DBusAny)) {
     enum canDBus = true;
-  } else static if(isInstanceOf!(Variant, T)) {
+  } else static if (isInstanceOf!(Variant, T)) {
     enum canDBus = canDBus!(VariantType!T);
-  } else static if(isInstanceOf!(VariantN, T)) {
+  } else static if (isInstanceOf!(VariantN, T)) {
     // Phobos-style variants are supported if limited to DBus compatible types.
     enum canDBus = (T.AllowedTypes.length > 0) && allCanDBus!(T.AllowedTypes);
-  } else static if(isTuple!T) {
+  } else static if (isTuple!T) {
     enum canDBus = allCanDBus!(T.Types);
-  } else static if(isInputRange!T) {
-    static if(is(ElementType!T == DictionaryEntry!(K, V), K, V)) {
+  } else static if (isInputRange!T) {
+    static if (is(ElementType!T == DictionaryEntry!(K, V), K, V)) {
       enum canDBus = basicDBus!K && canDBus!V;
     } else {
       enum canDBus = canDBus!(ElementType!T);
     }
-  } else static if(isAssociativeArray!T) {
+  } else static if (isAssociativeArray!T) {
     enum canDBus = basicDBus!(KeyType!T) && canDBus!(ValueType!T);
-  } else static if(is(T == struct) && !isInstanceOf!(DictionaryEntry, T)) {
+  } else static if (is(T == struct) && !isInstanceOf!(DictionaryEntry, T)) {
     enum canDBus = allCanDBus!(AllowedFieldTypes!T);
   } else {
     enum canDBus = false;
@@ -110,60 +97,63 @@ template canDBus(T) {
 
 unittest {
   import dunit.toolkit;
+
   (canDBus!int).assertTrue();
   (canDBus!(int[])).assertTrue();
-  (allCanDBus!(int,string,bool)).assertTrue();
-  (canDBus!(Tuple!(int[],bool,Variant!short))).assertTrue();
-  (canDBus!(Tuple!(int[],int[string]))).assertTrue();
+  (allCanDBus!(int, string, bool)).assertTrue();
+  (canDBus!(Tuple!(int[], bool, Variant!short))).assertTrue();
+  (canDBus!(Tuple!(int[], int[string]))).assertTrue();
   (canDBus!(int[string])).assertTrue();
 }
 
-string typeSig(T)() if(canDBus!T) {
-  static if(is(T == byte)) {
+string typeSig(T)()
+    if (canDBus!T) {
+  static if (is(T == byte)) {
     return "y";
-  } else static if(is(T == bool)) {
+  } else static if (is(T == bool)) {
     return "b";
-  } else static if(is(T == short)) {
+  } else static if (is(T == short)) {
     return "n";
-  } else static if(is(T == ushort)) {
+  } else static if (is(T == ushort)) {
     return "q";
-  } else static if(is(T == int)) {
+  } else static if (is(T == int)) {
     return "i";
-  } else static if(is(T == uint)) {
+  } else static if (is(T == uint)) {
     return "u";
-  } else static if(is(T == long)) {
+  } else static if (is(T == long)) {
     return "x";
-  } else static if(is(T == ulong)) {
+  } else static if (is(T == ulong)) {
     return "t";
-  } else static if(is(T == double)) {
+  } else static if (is(T == double)) {
     return "d";
-  } else static if(is(T == string)) {
+  } else static if (is(T == string)) {
     return "s";
-  } else static if(is(T == ObjectPath)) {
+  } else static if (is(T == ObjectPath)) {
     return "o";
-  } else static if(isInstanceOf!(Variant, T) || isInstanceOf!(VariantN, T)) {
+  } else static if (isInstanceOf!(Variant, T) || isInstanceOf!(VariantN, T)) {
     return "v";
-  } else static if(is(T B == enum)) {
+  } else static if (is(T B == enum)) {
     return typeSig!B;
-  } else static if(isInstanceOf!(BitFlags, T)) {
+  } else static if (isInstanceOf!(BitFlags, T)) {
     alias TemplateArgsOf!T[0] E;
     return typeSig!E;
-  } else static if(is(T == DBusAny)) {
-    static assert(false, "Cannot determine type signature of DBusAny. Change to Variant!DBusAny if a variant was desired.");
-  } else static if(isTuple!T) {
+  } else static if (is(T == DBusAny)) {
+    static assert(false,
+        "Cannot determine type signature of DBusAny. Change to Variant!DBusAny if a variant was desired.");
+  } else static if (isTuple!T) {
     string sig = "(";
-    foreach(i, S; T.Types) {
+    foreach (i, S; T.Types) {
       sig ~= typeSig!S();
-    } 
+    }
     sig ~= ")";
     return sig;
-  } else static if(isInputRange!T) {
+  } else static if (isInputRange!T) {
     return "a" ~ typeSig!(ElementType!T)();
-  } else static if(isAssociativeArray!T) {
+  } else static if (isAssociativeArray!T) {
     return "a{" ~ typeSig!(KeyType!T) ~ typeSig!(ValueType!T) ~ "}";
-  } else static if(is(T == struct)) {
+  } else static if (is(T == struct)) {
     string sig = "(";
-    foreach(i, S; AllowedFieldTypes!T) {
+    foreach (i, S; AllowedFieldTypes!T) {
       sig ~= typeSig!S();
     }
     sig ~= ")";
@@ -171,66 +161,99 @@ string typeSig(T)() if(canDBus!T) {
   }
 }
 
-string typeSig(T)() if(isInstanceOf!(DictionaryEntry, T)) {
+string typeSig(T)()
+    if (isInstanceOf!(DictionaryEntry, T)) {
   alias typeof(T.key) K;
   alias typeof(T.value) V;
   return "{" ~ typeSig!K ~ typeSig!V ~ '}';
 }
 
-string[] typeSigReturn(T)() if(canDBus!T) {
-  static if(is(T == Tuple!TS, TS...))
+string[] typeSigReturn(T)()
+    if (canDBus!T) {
+  static if (is(T == Tuple!TS, TS...))
     return typeSigArr!TS;
   else
     return [typeSig!T];
 }
 
-string typeSigAll(TS...)() if(allCanDBus!TS) {
+string typeSigAll(TS...)()
+    if (allCanDBus!TS) {
   string sig = "";
-  foreach(i,T; TS) {
+  foreach (i, T; TS) {
     sig ~= typeSig!T();
   }
   return sig;
 }
 
-string[] typeSigArr(TS...)() if(allCanDBus!TS) {
+string[] typeSigArr(TS...)()
+    if (allCanDBus!TS) {
   string[] sig = [];
-  foreach(i,T; TS) {
+  foreach (i, T; TS) {
     sig ~= typeSig!T();
   }
   return sig;
 }
 
-int typeCode(T)() if(canDBus!T) {
+int typeCode(T)()
+    if (canDBus!T) {
   int code = typeSig!T()[0];
   return (code != '(') ? code : 'r';
 }
 
-int typeCode(T)() if(isInstanceOf!(DictionaryEntry, T) && canDBus!(T[])) {
+int typeCode(T)()
+    if (isInstanceOf!(DictionaryEntry, T) && canDBus!(T[])) {
   return 'e';
 }
 
 unittest {
   import dunit.toolkit;
+
   // basics
   typeSig!int().assertEqual("i");
   typeSig!bool().assertEqual("b");
   typeSig!string().assertEqual("s");
   typeSig!(Variant!int)().assertEqual("v");
   // enums
-  enum E : byte { a, b, c }
+  enum E : byte {
+    a,
+    b,
+    c
+  }
+
   typeSig!E().assertEqual(typeSig!byte());
-  enum U : string { One = "One", Two = "Two" }
+  enum U : string {
+    One = "One",
+    Two = "Two"
+  }
+
   typeSig!U().assertEqual(typeSig!string());
   // bit flags
-  enum F : uint { a = 1, b = 2, c = 4 }
+  enum F : uint {
+    a = 1,
+    b = 2,
+    c = 4
+  }
+
   typeSig!(BitFlags!F)().assertEqual(typeSig!uint());
   // tuples (represented as structs in DBus)
-  typeSig!(Tuple!(int,string,string)).assertEqual("(iss)");
-  typeSig!(Tuple!(int,string,Variant!int,Tuple!(int,"k",double,"x"))).assertEqual("(isv(id))");
+  typeSig!(Tuple!(int, string, string)).assertEqual("(iss)");
+  typeSig!(Tuple!(int, string, Variant!int, Tuple!(int, "k", double, "x"))).assertEqual(
+      "(isv(id))");
   // structs
-  struct S1 { int a; double b; string s; }
+  struct S1 {
+    int a;
+    double b;
+    string s;
+  }
+
   typeSig!S1.assertEqual("(ids)");
-  struct S2 { Variant!int c; string d; S1 e; uint f; }
+  struct S2 {
+    Variant!int c;
+    string d;
+    S1 e;
+    uint f;
+  }
+
   typeSig!S2.assertEqual("(vs(ids)u)");
   // arrays
   typeSig!(int[]).assertEqual("ai");
@@ -240,7 +263,7 @@ unittest {
   typeSig!(int[string]).assertEqual("a{si}");
   typeSig!(DictionaryEntry!(string, int)[]).assertEqual("a{si}");
   // multiple arguments
-  typeSigAll!(int,bool).assertEqual("ib");
+  typeSigAll!(int, bool).assertEqual("ib");
   // Phobos-style variants
   canDBus!(std.variant.Variant).assertFalse();
   typeSig!(std.variant.Algebraic!(int, double, string)).assertEqual("v");
@@ -251,17 +274,18 @@ unittest {
   // ctfe-capable
   static string sig = typeSig!ulong();
   sig.assertEqual("t");
-  static string sig2 = typeSig!(Tuple!(int,string,string));
-  sig2.assertEqual("(iss)"); 
-  static string sig3 = typeSigAll!(int,string,string);
-  sig3.assertEqual("iss"); 
+  static string sig2 = typeSig!(Tuple!(int, string, string));
+  sig2.assertEqual("(iss)");
+  static string sig3 = typeSigAll!(int, string, string);
+  sig3.assertEqual("iss");
 }
 
-private template AllowedFieldTypes(S) if (is(S == struct)) {
+private template AllowedFieldTypes(S)
+    if (is(S == struct)) {
   import ddbus.attributes : isAllowedField;
   import std.meta : Filter, staticMap;
+
   static alias TypeOf(alias sym) = typeof(sym);
 
-  alias AllowedFieldTypes =
-    staticMap!(TypeOf, Filter!(isAllowedField, S.tupleof));
+  alias AllowedFieldTypes = staticMap!(TypeOf, Filter!(isAllowedField, S.tupleof));
 }
