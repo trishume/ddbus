@@ -22,5 +22,5 @@ void testServe(Connection conn) {
 void main() {
   Connection conn = connectToBus();
   testServe(conn);
-	writeln("It worked!");
+  writeln("It worked!");
 }

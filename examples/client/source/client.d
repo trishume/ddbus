@@ -17,5 +17,5 @@ void testCall(Connection conn) {
 void main() {
   Connection conn = connectToBus();
   testCall(conn);
-	writeln("It worked!");
+  writeln("It worked!");
 }
