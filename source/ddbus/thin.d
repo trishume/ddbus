@@ -1,6 +1,8 @@
 /// Thin OO wrapper around DBus types
 module ddbus.thin;
 
+import core.time : Duration;
+
 import ddbus.c_lib;
 import ddbus.conv;
 import ddbus.exception : TypeMismatchException;
@@ -735,6 +737,10 @@ struct Connection {
         return ret;
       });
     return Message(reply);
+  }
+
+  Message sendWithReplyBlocking(Message msg, Duration timeout) {
+    return sendWithReplyBlocking(msg, timeout.total!"msecs"().to!int);
   }
 }
 
