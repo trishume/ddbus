@@ -1,9 +1,5 @@
 {
 	"name": "client",
-	"homepage": "https://github.com/trishume/ddbus",
-	"copyright": "Copyright © 2017, Tristan Hume",
-	"authors": ["Tristan Hume"],
-	"targetType": "executable",
 	"dependencies": {
 		"ddbus": {"path": "../../"}
 	}
