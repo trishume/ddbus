@@ -1,3 +1,4 @@
+import core.time;
 import std.stdio;
 import ddbus;
 
@@ -9,7 +10,7 @@ void testCall(Connection conn) {
   }
   Message msg2 = Message("ca.thume.transience","/ca/thume/transience/screensurface",
                             "ca.thume.transience.screensurface","testPing");
-  Message res = conn.sendWithReplyBlocking(msg2,3000);
+  Message res = conn.sendWithReplyBlocking(msg2, 3.seconds);
   int result = res.read!int();
   writeln(result);
 }
