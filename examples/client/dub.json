@@ -1,0 +1,6 @@
+{
+	"name": "client",
+	"dependencies": {
+		"ddbus": {"path": "../../"}
+	}
+}
