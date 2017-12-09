@@ -432,7 +432,7 @@ struct DBusAny {
       if (is(T == const(DBusAny)[])) {
     enforce((type == 'a' && signature != "y") || type == 'r', new TypeMismatchException(
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
-        typeCode!T, type));
+        'a', type));
 
     return array;
   }
@@ -442,7 +442,7 @@ struct DBusAny {
       if (is(T == const(ubyte)[])) {
     enforce(type == 'a' && signature == "y", new TypeMismatchException(
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
-        typeCode!T, type));
+        'a', type));
 
     return binaryData;
   }
