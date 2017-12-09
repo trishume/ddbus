@@ -1,0 +1,8 @@
+[**.d]
+indent_style = space
+indent_size = 2
+
+dfmt_brace_style = otbs
+dfmt_space_after_keywords = true
+dfmt_space_after_cast = true
+dfmt_template_constraint_style = always_newline_indent
