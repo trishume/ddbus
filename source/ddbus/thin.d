@@ -532,32 +532,22 @@ struct DBusAny {
         alias E = Unqual!(ElementType!T);
 
         if (typeSig == "ay") {
+          auto data = get!(const(ubyte)[]);
           static if (is(E == ubyte) || is(E == byte)) {
-            return cast(T) binaryData.dup;
+            return cast(T) data.dup;
           } else {
-            T ret;
-            ret.length = binaryData.length;
-
-            foreach (i, b; binaryData)
-              ret[i] = b;
-
-            return ret;
+            return cast(T) data.map!(elem => elem.to!E).array;
           }
         } else if (type == 'a' || (type == 'r' && is(E == DBusAny))) {
-          E[] ret;
-          ret.length = array.length;
-
-          foreach (i, elem; array)
-            ret[i] = elem.to!(ElementType!T);
-
-          return cast(T) ret;
+          return cast(T) get!(const(DBusAny)[]).map!(elem => elem.to!E).array;
         }
       } else static if (isTuple!T) {
         if (type == 'r') {
           T ret;
 
-          foreach (i, T; ret.Types)
+          foreach (i, T; ret.Types) {
             ret[i] = tuple[i].to!T;
+          }
 
           return ret;
         }
