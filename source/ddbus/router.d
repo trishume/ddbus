@@ -142,9 +142,14 @@ class MessageRouter {
 <node name="%s">`;
 
   string introspectXML(string path) {
-    auto methods = callTable.byKey().filter!(a => (a.path == path) && !a.signal)().array() // .schwartzSort!((a) => a.iface, "a<b")();
-    .sort!((a,
-        b) => a.iface < b.iface)();
+    // dfmt off
+    auto methods = callTable
+      .byKey()
+      .filter!(a => (a.path == path) && !a.signal)
+      .array
+      .sort!((a, b) => a.iface < b.iface)();
+    // dfmt on
+
     auto ifaces = methods.groupBy();
     auto app = appender!string;
     formattedWrite(app, introspectHeader, path);

@@ -37,15 +37,17 @@ class TypeMismatchException : Exception {
       size_t line = __LINE__, Throwable next = null) pure nothrow @safe {
     string message;
 
+    // dfmt off
     if (expectedType == 'v') {
       message = "The type of value at the current position in the message is"
-        ~ " incompatible to the target variant type." ~ " Type code of the value: '" ~ cast(
-            char) actualType ~ '\'';
+        ~ " incompatible to the target variant type." ~ " Type code of the value: '"
+        ~ cast(char) actualType ~ '\'';
     } else {
       message = "The type of value at the current position in the message does"
-        ~ " not match the type of value to be read." ~ " Expected: '" ~ cast(
-            char) expectedType ~ "'," ~ " Got: '" ~ cast(char) actualType ~ '\'';
+        ~ " not match the type of value to be read." ~ " Expected: '"
+        ~ cast(char) expectedType ~ "'," ~ " Got: '" ~ cast(char) actualType ~ '\'';
     }
+    // dfmt on
 
     this(message, expectedType, actualType, file, line, next);
   }

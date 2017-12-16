@@ -67,13 +67,15 @@ enum SignalMethod;
 void registerMethods(T : Object)(MessageRouter router, string path, string iface, T obj) {
   MessagePattern patt = MessagePattern(path, iface, "", false);
   foreach (member; __traits(allMembers, T)) {
+    // dfmt off
     static if (__traits(compiles, __traits(getOverloads, obj, member))
-        && __traits(getOverloads, obj, member).length > 0 && __traits(compiles,
-          router.setHandler(patt, &__traits(getOverloads, obj, member)[0]))) {
+        && __traits(getOverloads, obj, member).length > 0
+        && __traits(compiles, router.setHandler(patt, &__traits(getOverloads, obj, member)[0]))) {
       patt.method = member;
       patt.signal = hasUDA!(__traits(getOverloads, obj, member)[0], SignalMethod);
       router.setHandler(patt, &__traits(getOverloads, obj, member)[0]);
     }
+    // dfmt on
   }
 }
 
