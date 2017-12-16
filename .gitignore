@@ -7,3 +7,4 @@ __dummy.html
 libddbus.*
 __test__library__
 /ddbus-test-*
+*.lst
