@@ -19,15 +19,16 @@ class PathIface {
     this.iface = iface.toStringz();
   }
 
-  Ret call(Ret, Args...)(string meth, Args args) if(allCanDBus!Args && canDBus!Ret) {
-    Message msg = Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
+  Ret call(Ret, Args...)(string meth, Args args)
+      if (allCanDBus!Args && canDBus!Ret) {
+    Message msg = Message(dbus_message_new_method_call(dest, path, iface, meth.toStringz()));
     msg.build(args);
     Message ret = conn.sendWithReplyBlocking(msg);
     return ret.read!Ret();
   }
 
   Message opDispatch(string meth, Args...)(Args args) {
-    Message msg = Message(dbus_message_new_method_call(dest,path,iface,meth.toStringz()));
+    Message msg = Message(dbus_message_new_method_call(dest, path, iface, meth.toStringz()));
     msg.build(args);
     return conn.sendWithReplyBlocking(msg);
   }
@@ -40,12 +41,13 @@ class PathIface {
 
 unittest {
   import dunit.toolkit;
+
   Connection conn = connectToBus();
-  PathIface obj = new PathIface(conn, "org.freedesktop.DBus","/org/freedesktop/DBus",
-                                "org.freedesktop.DBus");
+  PathIface obj = new PathIface(conn, "org.freedesktop.DBus",
+      "/org/freedesktop/DBus", "org.freedesktop.DBus");
   auto names = obj.GetNameOwner("org.freedesktop.DBus").to!string();
   names.assertEqual("org.freedesktop.DBus");
-  obj.call!string("GetNameOwner","org.freedesktop.DBus").assertEqual("org.freedesktop.DBus");
+  obj.call!string("GetNameOwner", "org.freedesktop.DBus").assertEqual("org.freedesktop.DBus");
 }
 
 enum SignalMethod;
@@ -63,30 +65,39 @@ enum SignalMethod;
    could be instantiated with any object efficiently and placed in the router table with minimal duplication.
  */
 void registerMethods(T : Object)(MessageRouter router, string path, string iface, T obj) {
-  MessagePattern patt = MessagePattern(path,iface,"",false);
-  foreach(member; __traits(allMembers, T)) {
+  MessagePattern patt = MessagePattern(path, iface, "", false);
+  foreach (member; __traits(allMembers, T)) {
+    // dfmt off
     static if (__traits(compiles, __traits(getOverloads, obj, member))
-               && __traits(getOverloads, obj, member).length > 0
-               && __traits(compiles, router.setHandler(patt, &__traits(getOverloads,obj,member)[0]))) {
+        && __traits(getOverloads, obj, member).length > 0
+        && __traits(compiles, router.setHandler(patt, &__traits(getOverloads, obj, member)[0]))) {
       patt.method = member;
-      patt.signal = hasUDA!(__traits(getOverloads,obj,member)[0], SignalMethod);
-      router.setHandler(patt, &__traits(getOverloads,obj,member)[0]);
+      patt.signal = hasUDA!(__traits(getOverloads, obj, member)[0], SignalMethod);
+      router.setHandler(patt, &__traits(getOverloads, obj, member)[0]);
     }
+    // dfmt on
   }
 }
 
 unittest {
   import dunit.toolkit;
+
   class Tester {
-    int lol(int x, string s, string[string] map, Variant!DBusAny any) {return 5;}
-    void wat() {}
-    @SignalMethod
-    void signalRecv() {}
+    int lol(int x, string s, string[string] map, Variant!DBusAny any) {
+      return 5;
+    }
+
+    void wat() {
+    }
+
+    @SignalMethod void signalRecv() {
+    }
   }
+
   auto o = new Tester;
   auto router = new MessageRouter;
-  registerMethods(router, "/","ca.thume.test",o);
-  MessagePattern patt = MessagePattern("/","ca.thume.test","wat");
+  registerMethods(router, "/", "ca.thume.test", o);
+  MessagePattern patt = MessagePattern("/", "ca.thume.test", "wat");
   router.callTable.assertHasKey(patt);
   patt.method = "signalRecv";
   patt.signal = true;
@@ -95,6 +106,6 @@ unittest {
   patt.signal = false;
   router.callTable.assertHasKey(patt);
   auto res = router.callTable[patt];
-  res.argSig.assertEqual(["i","s","a{ss}","v"]);
+  res.argSig.assertEqual(["i", "s", "a{ss}", "v"]);
   res.retSig.assertEqual(["i"]);
 }

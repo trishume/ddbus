@@ -48,24 +48,28 @@ struct ObjectPath {
   }
 
   ObjectPath opBinary(string op : "~")(string rhs) const pure @safe {
-    if (!rhs.startsWith("/"))
+    if (!rhs.startsWith("/")) {
       return opBinary!"~"(ObjectPath("/" ~ rhs));
-    else
+    } else {
       return opBinary!"~"(ObjectPath(rhs));
+    }
   }
 
   ObjectPath opBinary(string op : "~")(ObjectPath rhs) const pure @safe
   in {
     assert(ObjectPath.isValid(_value) && ObjectPath.isValid(rhs._value));
-  } out (v) {
+  }
+  out (v) {
     assert(ObjectPath.isValid(v._value));
-  } body {
+  }
+  body {
     ObjectPath ret;
 
-    if (_value == "/")
+    if (_value == "/") {
       ret._value = rhs._value;
-    else
+    } else {
       ret._value = _value ~ rhs._value;
+    }
 
     return ret;
   }
@@ -85,20 +89,21 @@ struct ObjectPath {
   static bool isValid(string objPath) pure @nogc nothrow @safe {
     import std.ascii : isAlphaNum;
 
-    if (!objPath.length)
+    if (!objPath.length) {
       return false;
-    if (objPath == "/")
+    }
+
+    if (objPath == "/") {
       return true;
-    if (objPath[0] != '/' || objPath[$ - 1] == '/')
+    }
+
+    if (objPath[0] != '/' || objPath[$ - 1] == '/') {
       return false;
+    }
+
     // .representation to avoid unicode exceptions -> @nogc & nothrow
-    return objPath.representation.splitter('/').drop(1)
-      .all!(a =>
-        a.length &&
-        a.all!(c =>
-          c.isAlphaNum || c == '_'
-        )
-      );
+    return objPath.representation.splitter('/').drop(1).all!(a => a.length
+        && a.all!(c => c.isAlphaNum || c == '_'));
   }
 }
 
@@ -137,8 +142,7 @@ struct DBusAny {
   /// Same functionality as Variant!T but with dynamic types if true.
   bool explicitVariant;
 
-  union
-  {
+  union {
     ///
     byte int8;
     ///
@@ -181,107 +185,125 @@ struct DBusAny {
   /// Automatically creates a DBusAny object with fitting parameters from a D type or Variant!T.
   /// Pass a `Variant!T` to make this an explicit variant.
   this(T)(T value) {
-    static if(is(T == byte) || is(T == ubyte)) {
+    static if (is(T == byte) || is(T == ubyte)) {
       this(typeCode!byte, null, false);
       int8 = cast(byte) value;
-    } else static if(is(T == short)) {
+    } else static if (is(T == short)) {
       this(typeCode!short, null, false);
       int16 = cast(short) value;
-    } else static if(is(T == ushort)) {
+    } else static if (is(T == ushort)) {
       this(typeCode!ushort, null, false);
       uint16 = cast(ushort) value;
-    } else static if(is(T == int)) {
+    } else static if (is(T == int)) {
       this(typeCode!int, null, false);
       int32 = cast(int) value;
-    } else static if(is(T == uint)) {
+    } else static if (is(T == uint)) {
       this(typeCode!uint, null, false);
       uint32 = cast(uint) value;
-    } else static if(is(T == long)) {
+    } else static if (is(T == long)) {
       this(typeCode!long, null, false);
       int64 = cast(long) value;
-    } else static if(is(T == ulong)) {
+    } else static if (is(T == ulong)) {
       this(typeCode!ulong, null, false);
       uint64 = cast(ulong) value;
-    } else static if(is(T == double)) {
+    } else static if (is(T == double)) {
       this(typeCode!double, null, false);
       float64 = cast(double) value;
-    } else static if(isSomeString!T) {
+    } else static if (isSomeString!T) {
       this(typeCode!string, null, false);
       str = value.to!string;
-    } else static if(is(T == bool)) {
+    } else static if (is(T == bool)) {
       this(typeCode!bool, null, false);
       boolean = cast(bool) value;
-    } else static if(is(T == ObjectPath)) {
+    } else static if (is(T == ObjectPath)) {
       this(typeCode!ObjectPath, null, false);
       obj = value;
-    } else static if(is(T == Variant!R, R)) {
-      static if(is(R == DBusAny)) {
+    } else static if (is(T == Variant!R, R)) {
+      static if (is(R == DBusAny)) {
         type = value.data.type;
         signature = value.data.signature;
         explicitVariant = true;
-        if(type == 'a' || type == 'r') {
-          if(signature == ['y'])
+        if (type == 'a' || type == 'r') {
+          if (signature == ['y']) {
             binaryData = value.data.binaryData;
-          else
+          } else {
             array = value.data.array;
-        } else if(type == 's')
+          }
+        } else if (type == 's') {
           str = value.data.str;
-        else if(type == 'e')
+        } else if (type == 'e') {
           entry = value.data.entry;
-        else
+        } else {
           uint64 = value.data.uint64;
+        }
       } else {
         this(value.data);
         explicitVariant = true;
       }
-    } else static if(is(T : DictionaryEntry!(K, V), K, V)) {
+    } else static if (is(T : DictionaryEntry!(K, V), K, V)) {
       this('e', null, false);
       entry = new DictionaryEntry!(DBusAny, DBusAny)();
-      static if(is(K == DBusAny))
+      static if (is(K == DBusAny)) {
         entry.key = value.key;
-      else
+      } else {
         entry.key = DBusAny(value.key);
-      static if(is(V == DBusAny))
+      }
+      static if (is(V == DBusAny)) {
         entry.value = value.value;
-      else
+      } else {
         entry.value = DBusAny(value.value);
-    } else static if(is(T == ubyte[]) || is(T == byte[])) {
+      }
+    } else static if (is(T == ubyte[]) || is(T == byte[])) {
       this('a', ['y'], false);
       binaryData = cast(ubyte[]) value;
-    } else static if(isInputRange!T) {
+    } else static if (isInputRange!T) {
       this.type = 'a';
-      static assert(!is(ElementType!T == DBusAny), "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
+
+      static assert(!is(ElementType!T == DBusAny),
+          "Array must consist of the same type, use Variant!DBusAny or DBusAny(tuple(...)) instead");
+
       static assert(.typeSig!(ElementType!T) != "y");
+
       this.signature = .typeSig!(ElementType!T);
       this.explicitVariant = false;
-      foreach(elem; value)
+
+      foreach (elem; value) {
         array ~= DBusAny(elem);
-    } else static if(isTuple!T) {
+      }
+    } else static if (isTuple!T) {
       this.type = 'r';
       this.signature = ['('];
       this.explicitVariant = false;
-      foreach(index, R; value.Types) {
+
+      foreach (index, R; value.Types) {
         auto var = DBusAny(value[index]);
         tuple ~= var;
-        if(var.explicitVariant)
+
+        if (var.explicitVariant) {
           this.signature ~= 'v';
-        else {
-          if (var.type != 'r')
+        } else {
+          if (var.type != 'r') {
             this.signature ~= cast(char) var.type;
-          if(var.type == 'a' || var.type == 'r')
+          }
+
+          if (var.type == 'a' || var.type == 'r') {
             this.signature ~= var.signature;
+          }
         }
       }
+
       this.signature ~= ')';
-    } else static if(isAssociativeArray!T) {
+    } else static if (isAssociativeArray!T) {
       this(value.byDictionaryEntries);
-    } else static assert(false, T.stringof ~ " not convertible to a Variant");
+    } else {
+      static assert(false, T.stringof ~ " not convertible to a Variant");
+    }
   }
 
   ///
   string toString() const {
     string valueStr;
-    switch(type) {
+    switch (type) {
     case typeCode!byte:
       valueStr = int8.to!string;
       break;
@@ -318,10 +340,12 @@ struct DBusAny {
     case 'a':
       import std.digest.digest : toHexString;
 
-      if(signature == ['y'])
+      if (signature == ['y']) {
         valueStr = "binary(" ~ binaryData.toHexString ~ ')';
-      else
+      } else {
         valueStr = '[' ~ array.map!(a => a.toString).join(", ") ~ ']';
+      }
+
       break;
     case 'r':
       valueStr = '(' ~ tuple.map!(a => a.toString).join(", ") ~ ')';
@@ -333,10 +357,9 @@ struct DBusAny {
       valueStr = "unknown";
       break;
     }
-    return "DBusAny(" ~ cast(char) type
-      ~ ", \"" ~ signature.idup
-      ~ "\", " ~ (explicitVariant ? "explicit" : "implicit")
-      ~ ", " ~ valueStr ~ ")";
+
+    return "DBusAny(" ~ cast(char) type ~ ", \"" ~ signature.idup ~ "\", " ~ (explicitVariant
+        ? "explicit" : "implicit") ~ ", " ~ valueStr ~ ")";
   }
 
   /++
@@ -354,24 +377,21 @@ struct DBusAny {
       DBusAny object is not the same as the DBus type used to represent T.
   +/
   T get(T)() @property const
-    if(staticIndexOf!(T, BasicTypes) >= 0)
-  {
-    enforce(type == typeCode!T,
-      new TypeMismatchException(
-        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
-          ~ " a value of DBus type '" ~ typeSig ~ "'.", typeCode!T, type));
+      if (staticIndexOf!(T, BasicTypes) >= 0) {
+    enforce(type == typeCode!T, new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ typeSig ~ "'.",
+        typeCode!T, type));
 
-    static if(isIntegral!T) {
-      enum memberName =
-        (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
+    static if (isIntegral!T) {
+      enum memberName = (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
       return __traits(getMember, this, memberName);
-    } else static if(is(T == double)) {
+    } else static if (is(T == double)) {
       return float64;
-    } else static if(is(T == string)) {
+    } else static if (is(T == string)) {
       return str;
-    } else static if(is(T == ObjectPath)) {
+    } else static if (is(T == ObjectPath)) {
       return obj;
-    } else static if(is(T == bool)) {
+    } else static if (is(T == bool)) {
       return boolean;
     } else {
       static assert(false);
@@ -380,12 +400,9 @@ struct DBusAny {
 
   /// ditto
   T get(T)() @property const
-    if(is(T == const(DBusAny)[]))
-  {
-    enforce((type == 'a' && signature != "y") || type == 'r',
-      new TypeMismatchException(
-        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
-          ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
+      if (is(T == const(DBusAny)[])) {
+    enforce((type == 'a' && signature != "y") || type == 'r', new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
         typeCode!T, type));
 
     return array;
@@ -393,12 +410,9 @@ struct DBusAny {
 
   /// ditto
   T get(T)() @property const
-    if (is(T == const(ubyte)[]))
-  {
-    enforce(type == 'a' && signature == "y",
-      new TypeMismatchException(
-        "Cannot get a " ~ T.stringof ~ " from a DBusAny with"
-          ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
+      if (is(T == const(ubyte)[])) {
+    enforce(type == 'a' && signature == "y", new TypeMismatchException(
+        "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ this.typeSig ~ "'.",
         typeCode!T, type));
 
     return binaryData;
@@ -408,10 +422,12 @@ struct DBusAny {
   DBusAny[DBusAny] toAA() {
     enforce(type == 'a' && signature && signature[0] == '{');
     DBusAny[DBusAny] aa;
-    foreach(val; array) {
+
+    foreach (val; array) {
       enforce(val.type == 'e');
       aa[val.entry.key] = val.entry.value;
     }
+
     return aa;
   }
 
@@ -421,34 +437,34 @@ struct DBusAny {
     Returns:
       The type signature of the value stored in this DBusAny object.
    +/
-  string typeSig() @property const pure nothrow @safe
-  {
-    if(type == 'a') {
+  string typeSig() @property const pure nothrow @safe {
+    if (type == 'a') {
       return "a" ~ signature;
-    } else if(type == 'r') {
+    } else if (type == 'r') {
       return signature;
-    } else if(type == 'e') {
-      return () @trusted {
+    } else if (type == 'e') {
+      return () @trusted{
         return "{" ~ entry.key.signature ~ entry.value.signature ~ "}";
-      } ();
+      }();
     } else {
-      return [ cast(char) type ];
+      return [cast(char) type];
     }
   }
 
   /// Converts a basic type, a tuple or an array to the D type with type checking. Tuples can get converted to an array too.
   T to(T)() {
-    static if(is(T == Variant!R, R)) {
-      static if(is(R == DBusAny)) {
+    static if (is(T == Variant!R, R)) {
+      static if (is(R == DBusAny)) {
         auto v = to!R;
         v.explicitVariant = false;
         return Variant!R(v);
-      } else
+      } else {
         return Variant!R(to!R);
-    } else static if(is(T == DBusAny)) {
+      }
+    } else static if (is(T == DBusAny)) {
       return this;
-    } else static if(isIntegral!T || isFloatingPoint!T) {
-      switch(type) {
+    } else static if (isIntegral!T || isFloatingPoint!T) {
+      switch (type) {
       case typeCode!byte:
         return cast(T) int8;
       case typeCode!short:
@@ -468,79 +484,106 @@ struct DBusAny {
       default:
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
       }
-    } else static if(is(T == bool)) {
-      if(type == 'b')
+    } else static if (is(T == bool)) {
+      if (type == 'b') {
         return boolean;
-      else
+      } else {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-    } else static if(isSomeString!T) {
-      if(type == 's')
+      }
+    } else static if (isSomeString!T) {
+      if (type == 's') {
         return str.to!T;
-      else if(type == 'o')
+      } else if (type == 'o') {
         return obj.toString();
-      else
+      } else {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-    } else static if(is(T == ObjectPath)) {
-      if(type == 'o')
+      }
+    } else static if (is(T == ObjectPath)) {
+      if (type == 'o') {
         return obj;
-      else
+      } else {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
-    } else static if(isDynamicArray!T) {
-      if(type != 'a' && type != 'r')
+      }
+    } else static if (isDynamicArray!T) {
+      if (type != 'a' && type != 'r') {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to an array");
+      }
+
       T ret;
-      if(signature == ['y']) {
-        static if(isIntegral!(ElementType!T))
-          foreach(elem; binaryData)
+      if (signature == ['y']) {
+        static if (isIntegral!(ElementType!T)) {
+          foreach (elem; binaryData) {
             ret ~= elem.to!(ElementType!T);
-      } else
-        foreach(elem; array)
+          }
+        }
+      } else {
+        foreach (elem; array) {
           ret ~= elem.to!(ElementType!T);
+        }
+      }
+
       return ret;
-    } else static if(isTuple!T) {
-      if(type != 'r')
+    } else static if (isTuple!T) {
+      if (type != 'r') {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
+      }
+
       T ret;
       enforce(ret.Types.length == tuple.length, "Tuple length mismatch");
-      foreach(index, T; ret.Types)
+      foreach (index, T; ret.Types) {
         ret[index] = tuple[index].to!T;
+      }
+
       return ret;
-    } else static if(isAssociativeArray!T) {
-      if(type != 'a' || !signature || signature[0] != '{')
+    } else static if (isAssociativeArray!T) {
+      if (type != 'a' || !signature || signature[0] != '{') {
         throw new Exception("Can't convert type " ~ cast(char) type ~ " to " ~ T.stringof);
+      }
+
       T ret;
-      foreach(pair; array) {
+      foreach (pair; array) {
         enforce(pair.type == 'e');
         ret[pair.entry.key.to!(KeyType!T)] = pair.entry.value.to!(ValueType!T);
       }
+
       return ret;
-    } else static assert(false, "Can't convert variant to " ~ T.stringof);
+    } else {
+      static assert(false, "Can't convert variant to " ~ T.stringof);
+    }
   }
 
   bool opEquals(ref in DBusAny b) const {
-    if(b.type != type || b.explicitVariant != explicitVariant)
+    if (b.type != type || b.explicitVariant != explicitVariant) {
       return false;
-    if((type == 'a' || type == 'r') && b.signature != signature)
+    }
+
+    if ((type == 'a' || type == 'r') && b.signature != signature) {
       return false;
-    if(type == 'a' && signature == ['y'])
+    }
+
+    if (type == 'a' && signature == ['y']) {
       return binaryData == b.binaryData;
-    if(type == 'a')
+    }
+
+    if (type == 'a') {
       return array == b.array;
-    else if(type == 'r')
+    } else if (type == 'r') {
       return tuple == b.tuple;
-    else if(type == 's')
+    } else if (type == 's') {
       return str == b.str;
-    else if(type == 'o')
+    } else if (type == 'o') {
       return obj == b.obj;
-    else if(type == 'e')
+    } else if (type == 'e') {
       return entry == b.entry || (entry && b.entry && *entry == *b.entry);
-    else
+    } else {
       return uint64 == b.uint64;
+    }
   }
 }
 
 unittest {
   import dunit.toolkit;
+
   DBusAny set(string member, T)(DBusAny v, T value) {
     mixin("v." ~ member ~ " = value;");
     return v;
@@ -549,12 +592,14 @@ unittest {
   void test(T)(T value, DBusAny b) {
     assertEqual(DBusAny(value), b);
 
-    static if(is(T == Variant!R, R)) {
-      static if(__traits(compiles, b.get!R))
+    static if (is(T == Variant!R, R)) {
+      static if (__traits(compiles, b.get!R)) {
         assertEqual(b.get!R, value.data);
+      }
     } else {
-      static if(__traits(compiles, b.get!T))
+      static if (__traits(compiles, b.get!T)) {
         assertEqual(b.get!T, value);
+      }
     }
 
     assertEqual(b.to!T, value);
@@ -569,7 +614,8 @@ unittest {
   test(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
   test(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
   test(true, set!"boolean"(DBusAny('b', null, false), true));
-  test(cast(ubyte[]) [1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false), cast(ubyte[]) [1, 2, 3]));
+  test(cast(ubyte[])[1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false),
+      cast(ubyte[])[1, 2, 3]));
 
   test(variant(cast(ubyte) 184), set!"int8"(DBusAny('y', null, true), cast(byte) 184));
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
@@ -579,18 +625,24 @@ unittest {
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
   test(variant(true), set!"boolean"(DBusAny('b', null, true), true));
-  test(variant(cast(ubyte[]) [1, 2, 3]), set!"binaryData"(DBusAny('a', ['y'], true), cast(ubyte[]) [1, 2, 3]));
+  test(variant(cast(ubyte[])[1, 2, 3]), set!"binaryData"(DBusAny('a', ['y'],
+      true), cast(ubyte[])[1, 2, 3]));
 
   test(variant(DBusAny(5)), set!"int32"(DBusAny('i', null, true), 5));
 
   test([1, 2, 3], set!"array"(DBusAny('a', ['i'], false), [DBusAny(1), DBusAny(2), DBusAny(3)]));
-  test(variant([1, 2, 3]), set!"array"(DBusAny('a', ['i'], true), [DBusAny(1), DBusAny(2), DBusAny(3)]));
+  test(variant([1, 2, 3]), set!"array"(DBusAny('a', ['i'], true), [DBusAny(1),
+      DBusAny(2), DBusAny(3)]));
 
-  test(tuple("a", 4, [1, 2]), set!"tuple"(DBusAny('r', "(siai)".dup, false), [DBusAny("a"), DBusAny(4), DBusAny([1, 2])]));
-  test(tuple("a", variant(4), variant([1, 2])), set!"tuple"(DBusAny('r', "(svv)", false), [DBusAny("a"), DBusAny(variant(4)), DBusAny(variant([1, 2]))]));
+  test(tuple("a", 4, [1, 2]), set!"tuple"(DBusAny('r', "(siai)".dup, false),
+      [DBusAny("a"), DBusAny(4), DBusAny([1, 2])]));
+  test(tuple("a", variant(4), variant([1, 2])), set!"tuple"(DBusAny('r',
+      "(svv)", false), [DBusAny("a"), DBusAny(variant(4)), DBusAny(variant([1, 2]))]));
 
-  test(["a": "b"], set!"array"(DBusAny('a', "{ss}", false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny("a"), DBusAny("b")))]));
-  test([variant("a"): 4], set!"array"(DBusAny('a', "{vi}", false), [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny(variant("a")), DBusAny(4)))]));
+  test(["a" : "b"], set!"array"(DBusAny('a', "{ss}", false),
+      [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny("a"), DBusAny("b")))]));
+  test([variant("a") : 4], set!"array"(DBusAny('a', "{vi}", false),
+      [DBusAny(DictionaryEntry!(DBusAny, DBusAny)(DBusAny(variant("a")), DBusAny(4)))]));
 }
 
 /// Marks the data as variant on serialization
@@ -605,17 +657,21 @@ Variant!T variant(T)(T data) {
 
 enum MessageType {
   Invalid = 0,
-  Call, Return, Error, Signal
+  Call,
+  Return,
+  Error,
+  Signal
 }
 
 struct Message {
-  DBusMessage *msg;
+  DBusMessage* msg;
 
   this(string dest, string path, string iface, string method) {
-    msg = dbus_message_new_method_call(dest.toStringz(), path.toStringz(), iface.toStringz(), method.toStringz());
+    msg = dbus_message_new_method_call(dest.toStringz(), path.toStringz(),
+        iface.toStringz(), method.toStringz());
   }
 
-  this(DBusMessage *m) {
+  this(DBusMessage* m) {
     msg = m;
   }
 
@@ -627,7 +683,8 @@ struct Message {
     dbus_message_unref(msg);
   }
 
-  void build(TS...)(TS args) if(allCanDBus!TS) {
+  void build(TS...)(TS args)
+      if (allCanDBus!TS) {
     DBusMessageIter iter;
     dbus_message_iter_init_append(msg, &iter);
     buildIter(&iter, args);
@@ -639,14 +696,17 @@ struct Message {
      read the first argument. This is suitable for single item returns.
      To read multiple arguments use readTuple.
   */
-  T read(T)() if(canDBus!T) {
+  T read(T)()
+      if (canDBus!T) {
     DBusMessageIter iter;
     dbus_message_iter_init(msg, &iter);
     return readIter!T(&iter);
   }
+
   alias read to;
 
-  Tup readTuple(Tup)() if(isTuple!Tup && allCanDBus!(Tup.Types)) {
+  Tup readTuple(Tup)()
+      if (isTuple!Tup && allCanDBus!(Tup.Types)) {
     DBusMessageIter iter;
     dbus_message_iter_init(msg, &iter);
     Tup ret;
@@ -659,7 +719,7 @@ struct Message {
   }
 
   MessageType type() {
-    return cast(MessageType)dbus_message_get_type(msg);
+    return cast(MessageType) dbus_message_get_type(msg);
   }
 
   bool isCall() {
@@ -673,21 +733,25 @@ struct Message {
     assert(cStr != null);
     return cStr.fromStringz().idup;
   }
+
   string path() {
     const(char)* cStr = dbus_message_get_path(msg);
     assert(cStr != null);
     return cStr.fromStringz().idup;
   }
+
   string iface() {
     const(char)* cStr = dbus_message_get_interface(msg);
     assert(cStr != null);
     return cStr.fromStringz().idup;
   }
+
   string member() {
     const(char)* cStr = dbus_message_get_member(msg);
     assert(cStr != null);
     return cStr.fromStringz().idup;
   }
+
   string sender() {
     const(char)* cStr = dbus_message_get_sender(msg);
     assert(cStr != null);
@@ -697,13 +761,14 @@ struct Message {
 
 unittest {
   import dunit.toolkit;
-  auto msg = Message("org.example.test", "/test","org.example.testing","testMethod");
+
+  auto msg = Message("org.example.test", "/test", "org.example.testing", "testMethod");
   msg.path().assertEqual("/test");
 }
 
 struct Connection {
-  DBusConnection *conn;
-  this(DBusConnection *connection) {
+  DBusConnection* conn;
+  this(DBusConnection* connection) {
     conn = connection;
   }
 
@@ -720,7 +785,7 @@ struct Connection {
   }
 
   void send(Message msg) {
-    dbus_connection_send(conn,msg.msg, null);
+    dbus_connection_send(conn, msg.msg, null);
   }
 
   void sendBlocking(Message msg) {
@@ -729,13 +794,13 @@ struct Connection {
   }
 
   Message sendWithReplyBlocking(Message msg, int timeout = -1) {
-    DBusMessage *dbusMsg = msg.msg;
+    DBusMessage* dbusMsg = msg.msg;
     dbus_message_ref(dbusMsg);
-    DBusMessage *reply = wrapErrors((err) {
-        auto ret = dbus_connection_send_with_reply_and_block(conn,dbusMsg,timeout,err);
-        dbus_message_unref(dbusMsg);
-        return ret;
-      });
+    DBusMessage* reply = wrapErrors((err) {
+      auto ret = dbus_connection_send_with_reply_and_block(conn, dbusMsg, timeout, err);
+      dbus_message_unref(dbusMsg);
+      return ret;
+    });
     return Message(reply);
   }
 
@@ -758,7 +823,7 @@ unittest {
   struct S2 {
     int h, i;
     @(Yes.DBusMarshal) int j, k;
-    int *p;
+    int* p;
   }
 
   @dbusMarshaling(MarshalingFlag.includePrivateFields)
@@ -774,40 +839,32 @@ unittest {
 
   __gshared int dummy;
 
-  enum testStruct = S3(
-    variant(5), "blah",
-    S1(-7, 63.5, "test"),
-    S2(84, -123, 78, 432, &dummy),
-    16
-  );
+  enum testStruct = S3(variant(5), "blah", S1(-7, 63.5, "test"), S2(84, -123,
+        78, 432, &dummy), 16);
 
   msg.build(testStruct);
 
   // Non-marshaled fields should appear as freshly initialized
-  enum expectedResult = S3(
-    variant(5), "blah",
-    S1(int.init, 63.5, "test"),
-    S2(int.init, int.init, 78, 432, null),
-    uint.init
-  );
+  enum expectedResult = S3(variant(5), "blah", S1(int.init, 63.5, "test"),
+        S2(int.init, int.init, 78, 432, null), uint.init);
 
   msg.read!S3().assertEqual(expectedResult);
-
 
 }
 
 Connection connectToBus(DBusBusType bus = DBusBusType.DBUS_BUS_SESSION) {
-  DBusConnection *conn = wrapErrors((err) { return dbus_bus_get(bus,err); });
+  DBusConnection* conn = wrapErrors((err) { return dbus_bus_get(bus, err); });
   return Connection(conn);
 }
 
 unittest {
   import dunit.toolkit;
+
   // This test will only pass if DBus is installed.
   Connection conn = connectToBus();
   conn.conn.assertTruthy();
   // We can only count on no system bus on OSX
-  version(OSX) {
+  version (OSX) {
     connectToBus(DBusBusType.DBUS_BUS_SYSTEM).assertThrow!DBusException();
   }
 }
