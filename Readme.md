@@ -65,8 +65,8 @@ Setting read only properties results in a thrown `DBusException`.
 You can register a delegate into a `MessageRouter` and a main loop in order to handle messages.
 After that you can request a name so that other DBus clients can connect to your program.
 
-You can return a `Tuple!(args)` to return multiple values (multiple out values in XML) or
-return a `Variant!DBusAny` to support returning any dynamic value.
+You can return a struct or `Tuple!(args)` to return multiple values (multiple out values in XML)
+or return a `Variant!DBusAny` to support returning any dynamic value.
 
 ```d
 import ddbus;
@@ -108,7 +108,7 @@ See the Concurrent Updates section for details how to implement this in a custom
 ## Type Marshaling
 
 `ddbus` includes fancy templated methods for marshaling D types in and out of DBus messages.
-All DBus-compatible basic types work (except dbus path objects and file descriptors).
+All DBus-compatible basic types work (except file descriptors).
 Any forward range can be marshalled in as DBus array of that type but arrays must be taken out as dynamic arrays.
 Structures are mapped to `Tuple` from `std.typecons`.
 
@@ -124,21 +124,24 @@ msg.readTuple!(typeof(args))().assertEqual(args);
 
 ## Modules
 
-- `thin`: thin wrapper types
-- `router`: message and signal routing based on `MessagePattern` structs.
+- `attributes`: defines some UDAs (and related templates) that can be used to customize
+struct marshaling.
 - `bus`: bus functionality like requesting names and event loops.
-- `simple`: simpler wrappers around other functionality.
 - `conv`: low level type marshaling methods.
-- `util`: templates for working with D type marshaling like `canDBus!T`.
 - `exception`: exception classes
-- `c_lib`: a D translation of the DBus C headers.
+- `router`: message and signal routing based on `MessagePattern` structs.
+- `simple`: simpler wrappers around other functionality.
+- `thin`: thin wrapper types
+- `util`: templates for working with D type marshaling like `canDBus!T`.
+- `c_lib`: a D translation of the DBus C headers
+  (you generally should not need to use these directly).
 
-Importing `ddbus` publicly imports the `thin`,`router`,`bus` and `simple` modules.
-These provide most of the functionality you probably want,
+Importing `ddbus` will publicly import the `thin`,`router`,`bus`, `simple` and
+`attributes` modules. These provide most of the functionality you probably want,
 you can import the others if you want lower level control.
 
-Nothing is hidden so if `ddbus` doesn't provide something you can simply import `c_lib` and use the pointers
-contained in the thin wrapper structs to do it yourself.
+Nothing is hidden so if `ddbus` doesn't provide something, you can always import
+`c_lib` and use the pointers contained in the thin wrapper structs to do it yourself.
 
 # Concurrent Updates
 
