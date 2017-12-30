@@ -109,14 +109,23 @@ See the Concurrent Updates section for details how to implement this in a custom
 
 `ddbus` includes fancy templated methods for marshaling D types in and out of DBus messages.
 All DBus-compatible basic types work (except file descriptors).
-Any forward range can be marshalled in as DBus array of that type but arrays must be taken out as dynamic arrays.
-Structures are mapped to `Tuple` from `std.typecons`.
+Any forward range can be marshaled in as DBus array of that type but arrays must be taken out as dynamic arrays.
+
+As per version 2.3.0, D `struct` types are fully supported by `ddbus`. By default all public fields of a structure are marshaled. This behavior can be changed by UDAs. Mapping DBus structures to a matching instance of `std.typecons.Tuple`, like earlier versions of `ddbus` did, is also still supported.
 
 Example using the lower level interface, the simple interfaces use these behind the scenes:
 ```d
 Message msg = Message("org.example.wow","/wut","org.test.iface","meth");
-bool[] emptyB;
-auto args = tuple(5,true,"wow",[6,5],tuple(6.2,4,[["lol"]],emptyB));
+
+struct S {
+  double a;
+  int b;
+  string[][] c;
+  bool[] d;
+}
+
+auto s = S(6.2, 4, [["lol"]], []);
+auto args = tuple(5, true, "wow", [6, 5], s);
 msg.build(args.expand);
 msg.signature().assertEqual("ibsai(diaasab)");
 msg.readTuple!(typeof(args))().assertEqual(args);
