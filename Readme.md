@@ -130,6 +130,21 @@ msg.build(args.expand);
 msg.signature().assertEqual("ibsai(diaasab)");
 msg.readTuple!(typeof(args))().assertEqual(args);
 ```
+### Basic types
+These are the basic types supported by `ddbus`:
+`bool`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `double`, `string`, `ObjectPath`
+
+### Overview of mappings of other types:
+
+| D type | DBus type |
+| --- | --- |
+| any `enum` | same as base type of the `enum` |
+| dynamic array `T[]` | array |
+| associative array `V[K]` | array of key-value pairs |
+| `Tuple!(T...)` | structure |
+| any `struct` | structure |
+| `ddbus` style variant `Variant!T` (is in fact just a wrapper type to force representation as a variant in DBus, use `Variant!DBusAny` for actual dynamic typing) | variant |
+| Phobos style variants `std.variant.VariantN` (only supported if set of allowed types is limited to types that can be marshaled by `ddbus`, so `std.variant.Variant` is not supported, but `std.variant.Algebraic` may be, depending on allowed types) | variant |
 
 ## Modules
 
