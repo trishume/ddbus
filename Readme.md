@@ -65,8 +65,8 @@ Setting read only properties results in a thrown `DBusException`.
 You can register a delegate into a `MessageRouter` and a main loop in order to handle messages.
 After that you can request a name so that other DBus clients can connect to your program.
 
-You can return a struct or `Tuple!(args)` to return multiple values (multiple out values in XML)
-or return a `Variant!DBusAny` to support returning any dynamic value.
+You can return a `Tuple!(args)` to return multiple values (multiple out values in XML) or
+return a `Variant!DBusAny` to support returning any dynamic value.
 
 ```d
 import ddbus;
