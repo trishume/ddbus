@@ -147,6 +147,33 @@ These are the basic types supported by `ddbus`:
 | `ddbus` style variant `Variant!T` | variant | `Variant!T` is in fact just a wrapper type to force representation as a variant in DBus, use `Variant!DBusAny` for actual dynamic typing. |
 | Phobos style variants `std.variant.VariantN` | variant | Only supported if set of allowed types is limited to types that can be marshaled by `ddbus`, so `std.variant.Variant` is not supported, but `std.variant.Algebraic` may be, depending on allowed types |
 
+### Customizing marshaling of `struct` types
+Marshaling behavior can be changed for a `struct` type by adding the `@dbusMarshaling`
+UDA with the appropriate flag. The following flags are supported:
+- `includePrivateFields` enables marshaling of private fields
+- `manualOnly` disables marshaling of all fields
+
+Marshaling of individual fields can be enabled or disabled by setting the `DBusMarshal`
+flag as an UDA. I.e. `@Yes.DBusMarshal` or `@No.DBusMarshal`.
+
+Note: symbols `Yes` and `No` are defined in `std.typecons`.
+
+After converting a DBus structure to a D `struct`, any fields that are not marshaled
+will appear freshly initialized. This is true even when just converting a `struct` to
+`DBusAny` and back.
+
+```D
+import ddbus.attributes;
+import std.typecons;
+
+@dbusMarshaling(MarshalingFlag.includePrivateFields)
+struct WeirdThing {
+  int a;                 // marshaled (default behavior not overridden)
+  @No.DBusMarshal int b; // explicitly not marshaled
+  private int c;         // marshaled, because of includePrivateFields
+}
+```
+
 ## Modules
 
 - `attributes`: defines some UDAs (and related templates) that can be used to customize
