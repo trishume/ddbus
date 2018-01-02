@@ -136,15 +136,16 @@ These are the basic types supported by `ddbus`:
 
 ### Overview of mappings of other types:
 
-| D type | DBus type |
-| --- | --- |
-| any `enum` | same as base type of the `enum` |
-| dynamic array `T[]` | array |
-| associative array `V[K]` | array of key-value pairs |
-| `Tuple!(T...)` | structure |
-| any `struct` | structure |
-| `ddbus` style variant `Variant!T` (is in fact just a wrapper type to force representation as a variant in DBus, use `Variant!DBusAny` for actual dynamic typing) | variant |
-| Phobos style variants `std.variant.VariantN` (only supported if set of allowed types is limited to types that can be marshaled by `ddbus`, so `std.variant.Variant` is not supported, but `std.variant.Algebraic` may be, depending on allowed types) | variant |
+| D type | DBus type | Comments |
+| --- | --- | --- |
+| any `enum` | `enum` base type | Only the exact values present in the definition of the `enum` type will be allowed. |
+| `std.typecons.BitFlags` | `enum` base type | Allows usage of OR'ed values of a flags `enum`. |
+| dynamic array `T[]` | array | |
+| associative array `V[K]` | array of key-value pairs | DBus has a special type for key-value pairs, which can be used as the element type of an array only. |
+| `Tuple!(T...)` | structure | The DBus structure will map all of the `Tuple`'s values in sequence. |
+| any `struct` | structure | The DBus structure will map all public fields of the `struct` type in order of definition, unless otherwise specified using UDAs. |
+| `ddbus` style variant `Variant!T` | variant | `Variant!T` is in fact just a wrapper type to force representation as a variant in DBus, use `Variant!DBusAny` for actual dynamic typing. |
+| Phobos style variants `std.variant.VariantN` | variant | Only supported if set of allowed types is limited to types that can be marshaled by `ddbus`, so `std.variant.Variant` is not supported, but `std.variant.Algebraic` may be, depending on allowed types |
 
 ## Modules
 
