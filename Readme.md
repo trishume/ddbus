@@ -111,7 +111,7 @@ See the Concurrent Updates section for details how to implement this in a custom
 All DBus-compatible basic types work (except file descriptors).
 Any forward range can be marshaled in as DBus array of that type but arrays must be taken out as dynamic arrays.
 
-As per version 2.3.0, D `struct` types are fully supported by `ddbus`. By default all public fields of a structure are marshaled. This behavior can be changed by UDAs. Mapping DBus structures to a matching instance of `std.typecons.Tuple`, like earlier versions of `ddbus` did, is also still supported.
+As per version 2.3.0, D `struct` types are fully supported by `ddbus`. By default all public fields of a structure are marshaled. This behavior can be [changed by UDAs](#customizing-marshaling-of-struct-types). Mapping DBus structures to a matching instance of `std.typecons.Tuple`, like earlier versions of `ddbus` did, is also still supported.
 
 Example using the lower level interface, the simple interfaces use these behind the scenes:
 ```d
