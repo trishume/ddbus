@@ -21,7 +21,7 @@ Before using, you will need to have the DBus C library installed on your compute
 `ddbus` is available on [DUB](http://code.dlang.org/packages/ddbus) so you can simply include it in your `dub.json`:
 ```json
 "dependencies": {
-  "ddbus": "~>2.1.0"
+  "ddbus": "~>2.3.0"
 }
 ```
 
