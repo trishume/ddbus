@@ -63,7 +63,7 @@ struct ObjectPath {
   out (v) {
     assert(ObjectPath.isValid(v._value));
   }
-  body {
+  do {
     ObjectPath ret;
 
     if (_value == "/") {
