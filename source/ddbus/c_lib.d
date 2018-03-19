@@ -1,6 +1,10 @@
 module ddbus.c_lib;
+
 import core.stdc.config;
 import core.stdc.stdarg;
+
+// dfmt off
+
 extern (C):
 // START dbus/dbus-arch-deps.d
 alias c_long dbus_int64_t;

@@ -21,7 +21,7 @@ Before using, you will need to have the DBus C library installed on your compute
 `ddbus` is available on [DUB](http://code.dlang.org/packages/ddbus) so you can simply include it in your `dub.json`:
 ```json
 "dependencies": {
-  "ddbus": "~>2.1.0"
+  "ddbus": "~>2.3.0"
 }
 ```
 
@@ -108,37 +108,92 @@ See the Concurrent Updates section for details how to implement this in a custom
 ## Type Marshaling
 
 `ddbus` includes fancy templated methods for marshaling D types in and out of DBus messages.
-All DBus-compatible basic types work (except dbus path objects and file descriptors).
-Any forward range can be marshalled in as DBus array of that type but arrays must be taken out as dynamic arrays.
-Structures are mapped to `Tuple` from `std.typecons`.
+All DBus-compatible basic types work (except file descriptors).
+Any forward range can be marshaled in as DBus array of that type but arrays must be taken out as dynamic arrays.
+
+As per version 2.3.0, D `struct` types are fully supported by `ddbus`. By default all public fields of a structure are marshaled. This behavior can be [changed by UDAs](#customizing-marshaling-of-struct-types). Mapping DBus structures to a matching instance of `std.typecons.Tuple`, like earlier versions of `ddbus` did, is also still supported.
 
 Example using the lower level interface, the simple interfaces use these behind the scenes:
 ```d
 Message msg = Message("org.example.wow","/wut","org.test.iface","meth");
-bool[] emptyB;
-auto args = tuple(5,true,"wow",[6,5],tuple(6.2,4,[["lol"]],emptyB));
+
+struct S {
+  double a;
+  int b;
+  string[][] c;
+  bool[] d;
+}
+
+auto s = S(6.2, 4, [["lol"]], []);
+auto args = tuple(5, true, "wow", [6, 5], s);
 msg.build(args.expand);
 msg.signature().assertEqual("ibsai(diaasab)");
 msg.readTuple!(typeof(args))().assertEqual(args);
 ```
+### Basic types
+These are the basic types supported by `ddbus`:
+`bool`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `double`, `string`, `ObjectPath`
+
+### Overview of mappings of other types:
+
+| D type                                       | DBus type                | Comments
+| -------------------------------------------- | ------------------------ | ---
+| any `enum`                                   | `enum` base type         | Only the exact values present in the definition of the `enum` type will be allowed.
+| `std.typecons.BitFlags`                      | `enum` base type         | Allows usage of OR'ed values of a flags `enum`.
+| dynamic array `T[]`                          | array                    |
+| associative array `V[K]`                     | array of key-value pairs | DBus has a special type for key-value pairs, which can be used as the element type of an array only.
+| `Tuple!(T...)`                               | structure                | The DBus structure will map all of the `Tuple`'s values in sequence.
+| any `struct`                                 | structure                | The DBus structure will map all public fields of the `struct` type in order of definition, unless otherwise specified using UDAs.
+| `ddbus` style variant `Variant!T`            | variant                  | `Variant!T` is in fact just a wrapper type to force representation as a variant in DBus, use `Variant!DBusAny` for actual dynamic typing.
+| Phobos style variants `std.variant.VariantN` | variant                  | Only supported if set of allowed types is limited to types that can be marshaled by `ddbus`, so `std.variant.Variant` is not supported, but `std.variant.Algebraic` may be, depending on allowed types
+
+### Customizing marshaling of `struct` types
+Marshaling behavior can be changed for a `struct` type by adding the `@dbusMarshaling`
+UDA with the appropriate flag. The following flags are supported:
+- `includePrivateFields` enables marshaling of private fields
+- `manualOnly` disables marshaling of all fields
+
+Marshaling of individual fields can be enabled or disabled by setting the `DBusMarshal`
+flag as an UDA. I.e. `@Yes.DBusMarshal` or `@No.DBusMarshal`.
+
+Note: symbols `Yes` and `No` are defined in `std.typecons`.
+
+After converting a DBus structure to a D `struct`, any fields that are not marshaled
+will appear freshly initialized. This is true even when just converting a `struct` to
+`DBusAny` and back.
+
+```d
+import ddbus.attributes;
+import std.typecons;
+
+@dbusMarshaling(MarshalingFlag.includePrivateFields)
+struct WeirdThing {
+  int a;                 // marshaled (default behavior not overridden)
+  @No.DBusMarshal int b; // explicitly not marshaled
+  private int c;         // marshaled, because of includePrivateFields
+}
+```
 
 ## Modules
 
-- `thin`: thin wrapper types
-- `router`: message and signal routing based on `MessagePattern` structs.
+- `attributes`: defines some UDAs (and related templates) that can be used to customize
+struct marshaling.
 - `bus`: bus functionality like requesting names and event loops.
-- `simple`: simpler wrappers around other functionality.
 - `conv`: low level type marshaling methods.
-- `util`: templates for working with D type marshaling like `canDBus!T`.
 - `exception`: exception classes
-- `c_lib`: a D translation of the DBus C headers.
+- `router`: message and signal routing based on `MessagePattern` structs.
+- `simple`: simpler wrappers around other functionality.
+- `thin`: thin wrapper types
+- `util`: templates for working with D type marshaling like `canDBus!T`.
+- `c_lib`: a D translation of the DBus C headers
+  (you generally should not need to use these directly).
 
-Importing `ddbus` publicly imports the `thin`,`router`,`bus` and `simple` modules.
-These provide most of the functionality you probably want,
+Importing `ddbus` will publicly import the `thin`, `router`, `bus`, `simple` and
+`attributes` modules. These provide most of the functionality you probably want,
 you can import the others if you want lower level control.
 
-Nothing is hidden so if `ddbus` doesn't provide something you can simply import `c_lib` and use the pointers
-contained in the thin wrapper structs to do it yourself.
+Nothing is hidden so if `ddbus` doesn't provide something, you can always import
+`c_lib` and use the pointers contained in the thin wrapper structs to do it yourself.
 
 # Concurrent Updates
 
