@@ -181,8 +181,8 @@ class MessageRouter {
 
     auto children = callTable.byKey()
       .filter!(a => (a.path.startsWith(childPath)) && !a.signal)().map!(
-          (s) => s.path.chompPrefix(childPath)).map!((s) => s.splitter('/')
-          .front).array().sort().uniq();
+          (s) => s.path.chompPrefix(childPath)).map!((s) => s.findSplit("/")[0])
+      .array().sort().uniq();
 
     foreach (child; children) {
       formattedWrite(app, `<node name="%s"/>`, child);
