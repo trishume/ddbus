@@ -717,6 +717,7 @@ struct Message {
     dbus_message_unref(msg);
   }
 
+  /// Creates a new iterator and puts in the arguments for calling a method.
   void build(TS...)(TS args)
       if (allCanDBus!TS) {
     DBusMessageIter iter;
@@ -793,6 +794,7 @@ struct Message {
   }
 }
 
+///
 unittest {
   import dunit.toolkit;
 
@@ -811,11 +813,16 @@ struct Connection {
   }
 
   ~this() {
-    dbus_connection_unref(conn);
+    if (conn) {
+      dbus_connection_unref(conn);
+      conn = null;
+    }
   }
 
   void close() {
-    dbus_connection_close(conn);
+    if (conn) {
+      dbus_connection_close(conn);
+    }
   }
 
   void send(Message msg) {
