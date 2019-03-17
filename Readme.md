@@ -132,7 +132,9 @@ msg.readTuple!(typeof(args))().assertEqual(args);
 ```
 ### Basic types
 These are the basic types supported by `ddbus`:
-`bool`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `double`, `string`, `ObjectPath`
+`bool`, `byte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `double`, `string`, `ObjectPath`, `InterfaceName`, `BusName`
+
+ObjectPath, InterfaceName and BusName are typesafe wrappers or aliases around strings which should be used to ensure type-safety. They do not allow implicit casts to each other but can be manually converted to strings either by casting to string.
 
 ### Overview of mappings of other types:
 

@@ -11,8 +11,8 @@ import std.algorithm;
 import std.format;
 
 struct MessagePattern {
-  string path;
-  string iface;
+  ObjectPath path;
+  InterfaceName iface;
   string method;
   bool signal;
 
@@ -23,7 +23,12 @@ struct MessagePattern {
     signal = (msg.type() == MessageType.Signal);
   }
 
+  deprecated("Use the constructor taking a ObjectPath and InterfaceName instead")
   this(string path, string iface, string method, bool signal = false) {
+    this(ObjectPath(path), interfaceName(iface), method, signal);
+  }
+
+  this(ObjectPath path, InterfaceName iface, string method, bool signal = false) {
     this.path = path;
     this.iface = iface;
     this.method = method;
@@ -48,7 +53,7 @@ struct MessagePattern {
 unittest {
   import dunit.toolkit;
 
-  auto msg = Message("org.example.test", "/test", "org.example.testing", "testMethod");
+  auto msg = Message(busName("org.example.test"), ObjectPath("/test"), interfaceName("org.example.testing"), "testMethod");
   auto patt = new MessagePattern(msg);
   patt.assertEqual(patt);
   patt.signal.assertFalse();
@@ -141,7 +146,12 @@ class MessageRouter {
   static string introspectHeader = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="%s">`;
 
+  deprecated("Use introspectXML(ObjectPath path) instead")
   string introspectXML(string path) {
+    return introspectXML(ObjectPath(path));
+  }
+
+  string introspectXML(ObjectPath path) {
     // dfmt off
     auto methods = callTable
       .byKey()
@@ -154,7 +164,7 @@ class MessageRouter {
     auto app = appender!string;
     formattedWrite(app, introspectHeader, path);
     foreach (iface; ifaces) {
-      formattedWrite(app, `<interface name="%s">`, iface.front.iface);
+      formattedWrite(app, `<interface name="%s">`, cast(string)iface.front.iface);
 
       foreach (methodPatt; iface.array()) {
         formattedWrite(app, `<method name="%s">`, methodPatt.method);
@@ -174,14 +184,11 @@ class MessageRouter {
       app.put("</interface>");
     }
 
-    string childPath = path;
-    if (!childPath.endsWith("/")) {
-      childPath ~= "/";
-    }
+    auto childPath = path;
 
-    auto children = callTable.byKey()
-      .filter!(a => (a.path.startsWith(childPath)) && !a.signal)().map!(
-          (s) => s.path.chompPrefix(childPath)).map!((s) => s.findSplit("/")[0])
+    auto children = callTable.byKey().filter!(a => a.path.startsWith(childPath)
+        && a.path != childPath && !a.signal)().map!((s) => s.path.chompPrefix(childPath))
+      .map!((s) => s.value[1 .. $].findSplit("/")[0])
       .array().sort().uniq();
 
     foreach (child; children) {
@@ -192,7 +199,12 @@ class MessageRouter {
     return app.data;
   }
 
+  deprecated("Use the method taking an ObjectPath instead")
   void handleIntrospect(string path, Message call, Connection conn) {
+    handleIntrospect(ObjectPath(path), call, conn);
+  }
+
+  void handleIntrospect(ObjectPath path, Message call, Connection conn) {
     auto retMsg = call.createReturn();
     retMsg.build(introspectXML(path));
     conn.sendBlocking(retMsg);
@@ -233,17 +245,17 @@ unittest {
 
   auto router = new MessageRouter();
   // set up test messages
-  MessagePattern patt = MessagePattern("/root", "ca.thume.test", "test");
+  MessagePattern patt = MessagePattern(ObjectPath("/root"), interfaceName("ca.thume.test"), "test");
   router.setHandler!(int, int)(patt, (int p) { return 6; });
-  patt = MessagePattern("/root", "ca.thume.tester", "lolwut");
+  patt = MessagePattern(ObjectPath("/root"), interfaceName("ca.thume.tester"), "lolwut");
   router.setHandler!(void, int, string)(patt, (int p, string p2) {  });
-  patt = MessagePattern("/root/wat", "ca.thume.tester", "lolwut");
+  patt = MessagePattern(ObjectPath("/root/wat"), interfaceName("ca.thume.tester"), "lolwut");
   router.setHandler!(int, int)(patt, (int p) { return 6; });
-  patt = MessagePattern("/root/bar", "ca.thume.tester", "lolwut");
+  patt = MessagePattern(ObjectPath("/root/bar"), interfaceName("ca.thume.tester"), "lolwut");
   router.setHandler!(Variant!DBusAny, int)(patt, (int p) {
     return variant(DBusAny(p));
   });
-  patt = MessagePattern("/root/foo", "ca.thume.tester", "lolwut");
+  patt = MessagePattern(ObjectPath("/root/foo"), interfaceName("ca.thume.tester"), "lolwut");
   router.setHandler!(Tuple!(string, string, int), int,
       Variant!DBusAny)(patt, (int p, Variant!DBusAny any) {
     Tuple!(string, string, int) ret;
@@ -252,10 +264,10 @@ unittest {
     ret[2] = p;
     return ret;
   });
-  patt = MessagePattern("/troll", "ca.thume.tester", "wow");
+  patt = MessagePattern(ObjectPath("/troll"), interfaceName("ca.thume.tester"), "wow");
   router.setHandler!(void)(patt, { return; });
 
-  patt = MessagePattern("/root/fancy", "ca.thume.tester", "crazyTest");
+  patt = MessagePattern(ObjectPath("/root/fancy"), interfaceName("ca.thume.tester"), "crazyTest");
   enum F : ushort {
     a = 1,
     b = 8,
@@ -294,13 +306,13 @@ unittest {
   // TODO: these tests rely on nondeterministic hash map ordering
   static string introspectResult = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/root"><interface name="ca.thume.test"><method name="test"><arg type="i" direction="in"/><arg type="i" direction="out"/></method></interface><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="s" direction="in"/></method></interface><node name="bar"/><node name="fancy"/><node name="foo"/><node name="wat"/></node>`;
-  router.introspectXML("/root").assertEqual(introspectResult);
+  router.introspectXML(ObjectPath("/root")).assertEqual(introspectResult);
   static string introspectResult2 = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/root/foo"><interface name="ca.thume.tester"><method name="lolwut"><arg type="i" direction="in"/><arg type="v" direction="in"/><arg type="s" direction="out"/><arg type="s" direction="out"/><arg type="i" direction="out"/></method></interface></node>`;
-  router.introspectXML("/root/foo").assertEqual(introspectResult2);
+  router.introspectXML(ObjectPath("/root/foo")).assertEqual(introspectResult2);
   static string introspectResult3 = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/root/fancy"><interface name="ca.thume.tester"><method name="crazyTest"><arg type="v" direction="in"/><arg type="i" direction="out"/></method></interface></node>`;
-  router.introspectXML("/root/fancy").assertEqual(introspectResult3);
-  router.introspectXML("/")
+  router.introspectXML(ObjectPath("/root/fancy")).assertEqual(introspectResult3);
+  router.introspectXML(ObjectPath("/"))
     .assertEndsWith(`<node name="/"><node name="root"/><node name="troll"/></node>`);
 }

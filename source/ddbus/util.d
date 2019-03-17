@@ -55,7 +55,7 @@ template allCanDBus(TS...) {
  +/
 package  // Don't add to the API yet, 'cause I intend to move it later
 alias BasicTypes = AliasSeq!(bool, byte, short, ushort, int, uint, long, ulong,
-    double, string, ObjectPath);
+    double, string, ObjectPath, InterfaceName, BusName);
 
 template basicDBus(T) {
   static if (staticIndexOf!(T, BasicTypes) >= 0) {
@@ -126,7 +126,7 @@ string typeSig(T)()
     return "t";
   } else static if (is(T == double)) {
     return "d";
-  } else static if (is(T == string)) {
+  } else static if (is(T == string) || is(T == InterfaceName) || is(T == BusName)) {
     return "s";
   } else static if (is(T == ObjectPath)) {
     return "o";
@@ -208,6 +208,10 @@ int typeCode(T)()
 unittest {
   import dunit.toolkit;
 
+  static assert(canDBus!ObjectPath);
+  static assert(canDBus!InterfaceName);
+  static assert(canDBus!BusName);
+
   // basics
   typeSig!int().assertEqual("i");
   typeSig!bool().assertEqual("b");
@@ -276,8 +280,8 @@ unittest {
   sig.assertEqual("t");
   static string sig2 = typeSig!(Tuple!(int, string, string));
   sig2.assertEqual("(iss)");
-  static string sig3 = typeSigAll!(int, string, string);
-  sig3.assertEqual("iss");
+  static string sig3 = typeSigAll!(int, string, InterfaceName, BusName);
+  sig3.assertEqual("isss");
 }
 
 private template AllowedFieldTypes(S)
