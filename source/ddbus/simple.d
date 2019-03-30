@@ -8,15 +8,21 @@ import std.string;
 import std.traits;
 
 class PathIface {
-  this(Connection conn, string dest, ObjectPath path, string iface) {
-    this(conn, dest, path.value, iface);
-  }
-
-  this(Connection conn, string dest, string path, string iface) {
+  this(Connection conn, BusName dest, ObjectPath path, InterfaceName iface) {
     this.conn = conn;
     this.dest = dest.toStringz();
-    this.path = path.toStringz();
+    this.path = path.value.toStringz();
     this.iface = iface.toStringz();
+  }
+
+  deprecated("Use the constructor taking BusName, ObjectPath and InterfaceName instead")
+  this(Connection conn, string dest, ObjectPath path, string iface) {
+    this(conn, busName(dest), path, interfaceName(iface));
+  }
+
+  deprecated("Use the constructor taking BusName, ObjectPath and InterfaceName instead")
+  this(Connection conn, string dest, string path, string iface) {
+    this(conn, busName(dest), ObjectPath(path), interfaceName(iface));
   }
 
   Ret call(Ret, Args...)(string meth, Args args)
@@ -43,14 +49,19 @@ unittest {
   import dunit.toolkit;
 
   Connection conn = connectToBus();
-  PathIface obj = new PathIface(conn, "org.freedesktop.DBus",
-      "/org/freedesktop/DBus", "org.freedesktop.DBus");
-  auto names = obj.GetNameOwner("org.freedesktop.DBus").to!string();
-  names.assertEqual("org.freedesktop.DBus");
-  obj.call!string("GetNameOwner", "org.freedesktop.DBus").assertEqual("org.freedesktop.DBus");
+  PathIface obj = new PathIface(conn, busName("org.freedesktop.DBus"),
+      ObjectPath("/org/freedesktop/DBus"), interfaceName("org.freedesktop.DBus"));
+  auto names = obj.GetNameOwner(interfaceName("org.freedesktop.DBus")).to!BusName();
+  names.assertEqual(busName("org.freedesktop.DBus"));
+  obj.call!BusName("GetNameOwner", interfaceName("org.freedesktop.DBus")).assertEqual(busName("org.freedesktop.DBus"));
 }
 
 enum SignalMethod;
+
+deprecated("Use the registerMethods overload taking an ObjectPath and InterfaceName instead")
+void registerMethods(T : Object)(MessageRouter router, string path, string iface, T obj) {
+  registerMethods(router, ObjectPath(path), interfaceName(iface), obj);
+}
 
 /**
    Registers all *possible* methods of an object in a router.
@@ -64,7 +75,7 @@ enum SignalMethod;
    and basically do what MessageRouter.setHandler does but avoiding duplication. Then this DBusWrapper!Class
    could be instantiated with any object efficiently and placed in the router table with minimal duplication.
  */
-void registerMethods(T : Object)(MessageRouter router, string path, string iface, T obj) {
+void registerMethods(T : Object)(MessageRouter router, ObjectPath path, InterfaceName iface, T obj) {
   MessagePattern patt = MessagePattern(path, iface, "", false);
   foreach (member; __traits(allMembers, T)) {
     // dfmt off
@@ -96,8 +107,8 @@ unittest {
 
   auto o = new Tester;
   auto router = new MessageRouter;
-  registerMethods(router, "/", "ca.thume.test", o);
-  MessagePattern patt = MessagePattern("/", "ca.thume.test", "wat");
+  registerMethods(router, ObjectPath("/"), interfaceName("ca.thume.test"), o);
+  MessagePattern patt = MessagePattern(ObjectPath("/"), interfaceName("ca.thume.test"), "wat");
   router.callTable.assertHasKey(patt);
   patt.method = "signalRecv";
   patt.signal = true;

@@ -18,7 +18,7 @@ void buildIter(TS...)(DBusMessageIter* iter, TS args)
     if (allCanDBus!TS) {
   foreach (index, arg; args) {
     alias TS[index] T;
-    static if (is(T == string)) {
+    static if (is(T == string) || is(T == InterfaceName) || is(T == BusName)) {
       immutable(char)* cStr = arg.toStringz();
       dbus_message_iter_append_basic(iter, typeCode!T, &cStr);
     } else static if (is(T == ObjectPath)) {
@@ -172,7 +172,7 @@ void buildIter(TS...)(DBusMessageIter* iter, TS args)
 }
 
 T readIter(T)(DBusMessageIter* iter)
-    if (is(T == enum)) {
+    if (is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) {
   import std.algorithm.searching : canFind;
 
   alias OriginalType!T B;
@@ -198,7 +198,7 @@ T readIter(T)(DBusMessageIter* iter)
 }
 
 T readIter(T)(DBusMessageIter* iter)
-    if (!is(T == enum) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
+    if (!(is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
   auto argType = dbus_message_iter_get_arg_type(iter);
   T ret;
 
@@ -222,12 +222,12 @@ T readIter(T)(DBusMessageIter* iter)
     enforce(argType == typeCode!T(), new TypeMismatchException(typeCode!T(), argType));
   }
 
-  static if (is(T == string) || is(T == ObjectPath)) {
+  static if (is(T == string) || is(T == InterfaceName) || is(T == BusName) || is(T == ObjectPath)) {
     const(char)* cStr;
     dbus_message_iter_get_basic(iter, &cStr);
     string str = cStr.fromStringz().idup; // copy string
-    static if (is(T == string)) {
-      ret = str;
+    static if (is(T == string) || is(T == InterfaceName) || is(T == BusName)) {
+      ret = cast(T)str;
     } else {
       ret = ObjectPath(str);
     }
@@ -378,7 +378,7 @@ unittest {
     return Variant!T(data);
   }
 
-  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth");
+  Message msg = Message(busName("org.example.wow"), ObjectPath("/wut"), interfaceName("org.test.iface"), "meth");
   bool[] emptyB;
   string[string] map;
   map["hello"] = "world";
@@ -388,22 +388,25 @@ unittest {
   anyVar.explicitVariant.assertEqual(false);
   auto tupleMember = DBusAny(tuple(Variant!int(45), Variant!ushort(5), 32,
       [1, 2], tuple(variant(4), 5), map));
-  Variant!DBusAny complexVar = variant(DBusAny(["hello world" : variant(DBusAny(1337)),
-      "array value" : variant(DBusAny([42, 64])), "tuple value"
-      : variant(tupleMember), "optimized binary data"
-      : variant(DBusAny(cast(ubyte[])[1, 2, 3, 4, 5, 6]))]));
+  Variant!DBusAny complexVar = variant(DBusAny([
+        "hello world": variant(DBusAny(1337)),
+        "array value": variant(DBusAny([42, 64])),
+        "tuple value": variant(tupleMember),
+        "optimized binary data": variant(DBusAny(cast(ubyte[])[1, 2, 3, 4, 5, 6]))
+      ]));
   complexVar.data.type.assertEqual('a');
   complexVar.data.signature.assertEqual("{sv}".dup);
   tupleMember.signature.assertEqual("(vviai(vi)a{ss})");
 
-  auto args = tuple(5, true, "wow", var(5.9), [6, 5], tuple(6.2, 4, [["lol"]],
+  auto args = tuple(5, true, "wow", interfaceName("methodName"), var(5.9), [6, 5], tuple(6.2, 4, [["lol"]],
       emptyB, var([4, 2])), map, anyVar, complexVar);
   msg.build(args.expand);
-  msg.signature().assertEqual("ibsvai(diaasabv)a{ss}tv");
+  msg.signature().assertEqual("ibssvai(diaasabv)a{ss}tv");
 
   msg.read!string().assertThrow!TypeMismatchException();
   msg.readTuple!(Tuple!(int, bool, double)).assertThrow!TypeMismatchException();
-  msg.readTuple!(Tuple!(int, bool, string, double)).assertEqual(tuple(5, true, "wow", 5.9));
+  msg.readTuple!(Tuple!(int, bool, string, InterfaceName, double))
+    .assertEqual(tuple(5, true, "wow", interfaceName("methodName"), 5.9));
 
   msg.readTuple!(typeof(args))().assertEqual(args);
   DBusMessageIter iter;
@@ -411,6 +414,7 @@ unittest {
   readIter!int(&iter).assertEqual(5);
   readIter!bool(&iter).assertEqual(true);
   readIter!string(&iter).assertEqual("wow");
+  readIter!InterfaceName(&iter).assertEqual(interfaceName("methodName"));
   readIter!double(&iter).assertEqual(5.9);
   readIter!(int[])(&iter).assertEqual([6, 5]);
   readIter!(Tuple!(double, int, string[][], bool[], Variant!(int[])))(&iter).assertEqual(
@@ -418,7 +422,7 @@ unittest {
 
   // There are two ways to read a dictionary, so duplicate the iterator to test both.
   auto iter2 = iter;
-  readIter!(string[string])(&iter).assertEqual(["hello" : "world"]);
+  readIter!(string[string])(&iter).assertEqual(["hello": "world"]);
   auto dict = readIter!(DictionaryEntry!(string, string)[])(&iter2);
   dict.length.assertEqual(1);
   dict[0].key.assertEqual("hello");
@@ -448,7 +452,7 @@ unittest {
 
   alias V = Algebraic!(byte, short, int, long, string);
 
-  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth2");
+  Message msg = Message(busName("org.example.wow"), ObjectPath("/wut"), interfaceName("org.test.iface"), "meth2");
   V v1 = "hello from variant";
   V v2 = cast(short) 345;
   msg.build(E.c, 4, 5u, 8u, v1, v2);

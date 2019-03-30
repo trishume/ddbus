@@ -22,6 +22,8 @@ import std.algorithm;
 public import ddbus.exception : wrapErrors, DBusException;
 
 struct ObjectPath {
+  enum root = ObjectPath("/");
+
   private string _value;
 
   this(string objPath) pure @safe {
@@ -44,8 +46,20 @@ struct ObjectPath {
     return hashOf(_value);
   }
 
+  T opCast(T : string)() const pure @nogc nothrow @safe {
+    return value;
+  }
+
   bool opEquals(ref const typeof(this) b) const pure @nogc nothrow @safe {
     return _value == b._value;
+  }
+
+  bool opEquals(const typeof(this) b) const pure @nogc nothrow @safe {
+    return _value == b._value;
+  }
+
+  bool opEquals(string b) const pure @nogc nothrow @safe {
+    return _value == b;
   }
 
   ObjectPath opBinary(string op : "~")(string rhs) const pure @safe {
@@ -83,6 +97,26 @@ struct ObjectPath {
     _value = opBinary!"~"(rhs)._value;
   }
 
+  bool startsWith(ObjectPath withThat) pure @nogc nothrow @safe {
+    if (withThat._value == "/")
+      return true;
+    else if (_value == "/")
+      return false;
+    else
+      return _value.representation.splitter('/').startsWith(withThat._value.representation.splitter('/'));
+  }
+
+  /// Removes a prefix from this path and returns the remainder. Keeps leading slashes.
+  /// Returns this unmodified if the prefix doesn't match.
+  ObjectPath chompPrefix(ObjectPath prefix) pure @nogc nothrow @safe {
+    if (prefix._value == "/" || !startsWith(prefix))
+      return this;
+    else if (prefix._value == _value)
+      return ObjectPath.root;
+    else
+      return ObjectPath.assumePath(_value[prefix._value.length .. $]);
+  }
+
   /++
     Returns: `false` for empty strings or strings that don't match the
     pattern `(/[0-9A-Za-z_]+)+|/`.
@@ -106,6 +140,35 @@ struct ObjectPath {
     return objPath.representation.splitter('/').drop(1).all!(a => a.length
         && a.all!(c => c.isAlphaNum || c == '_'));
   }
+
+  /// Does an unsafe assignment to an ObjectPath.
+  static ObjectPath assumePath(string path) pure @nogc nothrow @safe {
+    ObjectPath ret;
+    ret._value = path;
+    return ret;
+  }
+}
+
+/// Serves as typesafe alias. Instances should be created using busName instead of casting.
+/// It prevents accidental usage of bus names in other string parameter fields and makes the API clearer.
+enum BusName : string {
+  none = null
+}
+
+/// Casts a bus name argument to a BusName type. May include additional validation in the future.
+BusName busName(string name) pure @nogc nothrow @safe {
+  return cast(BusName) name;
+}
+
+/// Serves as typesafe alias. Instances should be created using interfaceName instead of casting.
+/// It prevents accidental usage of interface paths in other string parameter fields and makes the API clearer.
+enum InterfaceName : string {
+  none = null
+}
+
+/// Casts a interface path argument to an InterfaceName type. May include additional validation in the future.
+InterfaceName interfaceName(string path) pure @nogc nothrow @safe {
+  return cast(InterfaceName) path;
 }
 
 unittest {
@@ -118,6 +181,20 @@ unittest {
   auto obj = ObjectPath(path);
   obj.value.assertEqual(path);
   obj.toHash().assertEqual(path.hashOf);
+
+  ObjectPath("/some/path").startsWith(ObjectPath("/some")).assertTrue();
+  ObjectPath("/some/path").startsWith(ObjectPath("/path")).assertFalse();
+  ObjectPath("/some/path").startsWith(ObjectPath("/")).assertTrue();
+  ObjectPath("/").startsWith(ObjectPath("/")).assertTrue();
+  ObjectPath("/").startsWith(ObjectPath("/some/path")).assertFalse();
+
+  ObjectPath("/some/path").chompPrefix(ObjectPath("/some")).assertEqual(ObjectPath("/path"));
+  ObjectPath("/some/path").chompPrefix(ObjectPath("/bar")).assertEqual(ObjectPath("/some/path"));
+  ObjectPath("/some/path").chompPrefix(ObjectPath("/")).assertEqual(ObjectPath("/some/path"));
+  ObjectPath("/some/path").chompPrefix(ObjectPath("/some/path")).assertEqual(ObjectPath("/"));
+  ObjectPath("/some/path").chompPrefix(ObjectPath("/some/path/extra")).assertEqual(ObjectPath("/some/path"));
+  ObjectPath("/").chompPrefix(ObjectPath("/some")).assertEqual(ObjectPath("/"));
+  ObjectPath("/").chompPrefix(ObjectPath("/")).assertEqual(ObjectPath("/"));
 }
 
 unittest {
@@ -418,6 +495,8 @@ struct DBusAny {
       return float64;
     } else static if (is(T == string)) {
       return str;
+    } else static if (is(T == InterfaceName) || is(T == BusName)) {
+      return cast(T) str;
     } else static if (is(T == ObjectPath)) {
       return obj;
     } else static if (is(T == bool)) {
@@ -697,14 +776,23 @@ enum MessageType {
   Signal
 }
 
+/// Represents a message in the dbus system. Use the constructor to 
 struct Message {
   DBusMessage* msg;
 
+  deprecated("Use the constructor taking a BusName, ObjectPath and InterfaceName instead")
   this(string dest, string path, string iface, string method) {
     msg = dbus_message_new_method_call(dest.toStringz(), path.toStringz(),
         iface.toStringz(), method.toStringz());
   }
 
+  /// Prepares a new method call to an "instance" "object" "interface" "method".
+  this(BusName dest, ObjectPath path, InterfaceName iface, string method) {
+    msg = dbus_message_new_method_call(dest.toStringz(),
+        path.value.toStringz(), iface.toStringz(), method.toStringz());
+  }
+
+  /// Wraps an existing low level message object.
   this(DBusMessage* m) {
     msg = m;
   }
@@ -714,7 +802,10 @@ struct Message {
   }
 
   ~this() {
-    dbus_message_unref(msg);
+    if (msg) {
+      dbus_message_unref(msg);
+      msg = null;
+    }
   }
 
   /// Creates a new iterator and puts in the arguments for calling a method.
@@ -769,16 +860,16 @@ struct Message {
     return cStr.fromStringz().idup;
   }
 
-  string path() {
+  ObjectPath path() {
     const(char)* cStr = dbus_message_get_path(msg);
     assert(cStr != null);
-    return cStr.fromStringz().idup;
+    return ObjectPath(cStr.fromStringz().idup);
   }
 
-  string iface() {
+  InterfaceName iface() {
     const(char)* cStr = dbus_message_get_interface(msg);
     assert(cStr != null);
-    return cStr.fromStringz().idup;
+    return interfaceName(cStr.fromStringz().idup);
   }
 
   string member() {
@@ -798,7 +889,7 @@ struct Message {
 unittest {
   import dunit.toolkit;
 
-  auto msg = Message("org.example.test", "/test", "org.example.testing", "testMethod");
+  auto msg = Message(busName("org.example.test"), ObjectPath("/test"), interfaceName("org.example.testing"), "testMethod");
   msg.path().assertEqual("/test");
 }
 
@@ -876,7 +967,7 @@ unittest {
     @(No.DBusMarshal) uint g;
   }
 
-  Message msg = Message("org.example.wow", "/wut", "org.test.iface", "meth3");
+  Message msg = Message(busName("org.example.wow"), ObjectPath("/wut"), interfaceName("org.test.iface"), "meth3");
 
   __gshared int dummy;
 

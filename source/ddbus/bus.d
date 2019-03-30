@@ -5,9 +5,9 @@ import ddbus.thin;
 import ddbus.c_lib;
 import std.string;
 
-enum BusService = "org.freedesktop.DBus";
-enum BusPath = "/org/freedesktop/DBus";
-enum BusInterface = "org.freedesktop.DBus";
+enum BusService = busName("org.freedesktop.DBus");
+enum BusInterface = interfaceName("org.freedesktop.DBus");
+enum BusPath = ObjectPath("/org/freedesktop/DBus");
 
 enum NameFlags {
   AllowReplace = 1,
@@ -15,10 +15,16 @@ enum NameFlags {
   NoQueue = 4
 }
 
+deprecated("Use the overload taking a BusName instead")
+bool requestName(Connection conn, string name,
+    NameFlags flags = NameFlags.NoQueue | NameFlags.AllowReplace) {
+  return requestName(conn, busName(name), flags);
+}
+
 /// Requests a DBus well-known name.
 /// returns if the name is owned after the call.
 /// Involves blocking call on a DBus method, may throw an exception on failure.
-bool requestName(Connection conn, string name,
+bool requestName(Connection conn, BusName name,
     NameFlags flags = NameFlags.NoQueue | NameFlags.AllowReplace) {
   auto msg = Message(BusService, BusPath, BusInterface, "RequestName");
   msg.build(name, cast(uint)(flags));
@@ -44,5 +50,5 @@ unittest {
   import dunit.toolkit;
 
   Connection conn = connectToBus();
-  conn.requestName("ca.thume.ddbus.testing").assertTrue();
+  conn.requestName(busName("ca.thume.ddbus.testing")).assertTrue();
 }
