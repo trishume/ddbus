@@ -444,7 +444,7 @@ struct DBusAny {
       valueStr = boolean ? "true" : "false";
       break;
     case 'a':
-      import std.digest.digest : toHexString;
+      import std.digest : toHexString;
 
       if (signature == ['y']) {
         valueStr = "binary(" ~ binaryData.toHexString ~ ')';
