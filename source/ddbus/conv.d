@@ -17,7 +17,7 @@ import std.variant : VariantN;
 void buildIter(TS...)(DBusMessageIter* iter, TS args)
     if (allCanDBus!TS) {
   foreach (index, arg; args) {
-    alias TS[index] T;
+    alias T = Unqual!(TS[index]);
     static if (is(T == string) || is(T == InterfaceName) || is(T == BusName)) {
       immutable(char)* cStr = arg.toStringz();
       dbus_message_iter_append_basic(iter, typeCode!T, &cStr);
@@ -172,10 +172,10 @@ void buildIter(TS...)(DBusMessageIter* iter, TS args)
 }
 
 T readIter(T)(DBusMessageIter* iter)
-    if (is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) {
+    if (is(T == enum) && !is(Unqual!T == InterfaceName) && !is(Unqual!T == BusName)) {
   import std.algorithm.searching : canFind;
 
-  alias OriginalType!T B;
+  alias B = Unqual!(OriginalType!T);
 
   B value = readIter!B(iter);
   enforce(only(EnumMembers!T).canFind(value), new InvalidValueException(value, T.stringof));
@@ -197,8 +197,10 @@ T readIter(T)(DBusMessageIter* iter)
   return T(cast(E) value);
 }
 
-T readIter(T)(DBusMessageIter* iter)
-    if (!(is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
+U readIter(U)(DBusMessageIter* iter)
+    if (!(is(U == enum) && !is(Unqual!U == InterfaceName) && !is(Unqual!U == BusName)) && !isInstanceOf!(BitFlags, U) && canDBus!U) {
+  alias T = Unqual!U;
+
   auto argType = dbus_message_iter_get_arg_type(iter);
   T ret;
 
@@ -214,7 +216,7 @@ T readIter(T)(DBusMessageIter* iter)
           ret.explicitVariant = true;
       }
       dbus_message_iter_next(iter);
-      return ret;
+      return cast(U) ret;
     }
   }
 
@@ -226,7 +228,7 @@ T readIter(T)(DBusMessageIter* iter)
     const(char)* cStr;
     dbus_message_iter_get_basic(iter, &cStr);
     string str = cStr.fromStringz().idup; // copy string
-    static if (is(T == string) || is(T == InterfaceName) || is(T == BusName)) {
+    static if (is(T == string) || is(T : InterfaceName) || is(T : BusName)) {
       ret = cast(T)str;
     } else {
       ret = ObjectPath(str);
@@ -239,20 +241,20 @@ T readIter(T)(DBusMessageIter* iter)
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
     readIterTuple!T(&sub, ret);
-  } else static if (is(T t : U[], U)) {
-    assert(dbus_message_iter_get_element_type(iter) == typeCode!U);
+  } else static if (is(T t : S[], S)) {
+    assert(dbus_message_iter_get_element_type(iter) == typeCode!S);
 
     DBusMessageIter sub;
     dbus_message_iter_recurse(iter, &sub);
 
     while (dbus_message_iter_get_arg_type(&sub) != 0) {
-      static if (is(U == DictionaryEntry!(K, V), K, V)) {
+      static if (is(S == DictionaryEntry!(K, V), K, V)) {
         DBusMessageIter entry;
         dbus_message_iter_recurse(&sub, &entry);
-        ret ~= U(readIter!K(&entry), readIter!V(&entry));
+        ret ~= S(readIter!K(&entry), readIter!V(&entry));
         dbus_message_iter_next(&sub);
       } else {
-        ret ~= readIter!U(&sub);
+        ret ~= readIter!S(&sub);
       }
     }
   } else static if (isInstanceOf!(Variant, T)) {
@@ -295,13 +297,13 @@ T readIter(T)(DBusMessageIter* iter)
 
     if (ret.type == 's') {
       ret.str = readIter!string(iter);
-      return ret;
+      return cast(U) ret;
     } else if (ret.type == 'o') {
       ret.obj = readIter!ObjectPath(iter);
-      return ret;
+      return cast(U) ret;
     } else if (ret.type == 'b') {
       ret.boolean = readIter!bool(iter);
-      return ret;
+      return cast(U) ret;
     } else if (dbus_type_is_basic(ret.type)) {
       dbus_message_iter_get_basic(iter, &ret.int64);
     } else if (ret.type == 'a') {
@@ -351,7 +353,7 @@ T readIter(T)(DBusMessageIter* iter)
   }
 
   dbus_message_iter_next(iter);
-  return ret;
+  return cast(U) ret;
 }
 
 void readIterTuple(Tup)(DBusMessageIter* iter, ref Tup tuple)
