@@ -71,6 +71,9 @@ void registerMethods(T : Object)(MessageRouter router, string path, string iface
    working so if some methods randomly don't seem to be added, you should probably use
    setHandler on the router directly. It is also not efficient and creates a closure for every method.
 
+   The handler may throw a DBusErrorReturn to generate a DBus error response to
+   the request.
+
    TODO: replace this with something that generates a wrapper class who's methods take and return messages
    and basically do what MessageRouter.setHandler does but avoiding duplication. Then this DBusWrapper!Class
    could be instantiated with any object efficiently and placed in the router table with minimal duplication.

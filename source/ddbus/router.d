@@ -105,20 +105,27 @@ class MessageRouter {
 
   void setHandler(Ret, Args...)(MessagePattern patt, Ret delegate(Args) handler) {
     void handlerWrapper(Message call, Connection conn) {
+      import ddbus.exception : DBusErrorReturn;
       Tuple!Args args = call.readTuple!(Tuple!Args)();
-      auto retMsg = call.createReturn();
 
-      static if (!is(Ret == void)) {
-        Ret ret = handler(args.expand);
-        static if (is(Ret == Tuple!T, T...)) {
-          retMsg.build!T(ret.expand);
+      Message retMsg;
+      try {
+        retMsg = call.createReturn();
+
+        static if (!is(Ret == void)) {
+          Ret ret = handler(args.expand);
+          static if (is(Ret == Tuple!T, T...)) {
+            retMsg.build!T(ret.expand);
+          } else {
+            retMsg.build(ret);
+          }
         } else {
-          retMsg.build(ret);
+          handler(args.expand);
         }
-      } else {
-        handler(args.expand);
+      } catch(DBusErrorReturn e) {
+        retMsg = Message(dbus_message_new_error(call.msg,
+            e.errorName.toStringz, e.msg.toStringz));
       }
-
       if (!patt.signal) {
         conn.send(retMsg);
       }

@@ -28,6 +28,24 @@ class DBusException : Exception {
 }
 
 /++
+  Throw this from a handler to have it automatically translate to an Error
+  reply.
++/
+class DBusErrorReturn : Exception {
+  string errorName = "org.freedesktop.DBus.Error.Failed";
+
+  this(string errMsg, string file = __FILE__, size_t line = __LINE__,
+      Throwable next = null) pure nothrow {
+    super(errMsg, file, line, next);
+  }
+
+  typeof(this) withErrorName(string _errorName) {
+    errorName = _errorName;
+    return this;
+  }
+}
+
+/++
   Thrown when the signature of a message does not match the requested types or
   when trying to get a value from a DBusAny object that does not match the type
   of its actual value.
