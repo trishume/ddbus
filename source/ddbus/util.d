@@ -57,7 +57,8 @@ package  // Don't add to the API yet, 'cause I intend to move it later
 alias BasicTypes = AliasSeq!(bool, ubyte, short, ushort, int, uint, long, ulong,
     double, string, ObjectPath, InterfaceName, BusName);
 
-template basicDBus(T) {
+template basicDBus(U) {
+  alias T = Unqual!U;
   static if (staticIndexOf!(T, BasicTypes) >= 0) {
     enum basicDBus = true;
   } else static if (is(T B == enum)) {
@@ -70,7 +71,8 @@ template basicDBus(T) {
   }
 }
 
-template canDBus(T) {
+template canDBus(U) {
+  alias T = Unqual!U;
   static if (basicDBus!T || is(T == DBusAny)) {
     enum canDBus = true;
   } else static if (isInstanceOf!(Variant, T)) {
@@ -106,8 +108,9 @@ unittest {
   (canDBus!(int[string])).assertTrue();
 }
 
-string typeSig(T)()
-    if (canDBus!T) {
+string typeSig(U)()
+    if (canDBus!U) {
+  alias T = Unqual!U;
   static if (is(T == ubyte)) {
     return "y";
   } else static if (is(T == bool)) {
@@ -205,6 +208,33 @@ int typeCode(T)()
   return 'e';
 }
 
+/**
+  Params:
+    type = the type code of a type (first character in a type string)
+  Returns: true if the given type is an integer.
+*/
+bool dbusIsIntegral(int type) @property {
+  return type == 'y' || type == 'n' || type == 'q' || type == 'i' || type == 'u' || type == 'x' || type == 't';
+}
+
+/**
+  Params:
+    type = the type code of a type (first character in a type string)
+  Returns: true if the given type is a floating point value.
+*/
+bool dbusIsFloating(int type) @property {
+  return type == 'd';
+}
+
+/**
+  Params:
+    type = the type code of a type (first character in a type string)
+  Returns: true if the given type is an integer or a floating point value.
+*/
+bool dbusIsNumeric(int type) @property {
+  return dbusIsIntegral(type) || dbusIsFloating(type);
+}
+
 unittest {
   import dunit.toolkit;
 
@@ -216,6 +246,10 @@ unittest {
   typeSig!int().assertEqual("i");
   typeSig!bool().assertEqual("b");
   typeSig!string().assertEqual("s");
+  typeSig!InterfaceName().assertEqual("s");
+  typeSig!(immutable(InterfaceName))().assertEqual("s");
+  typeSig!ObjectPath().assertEqual("o");
+  typeSig!(immutable(ObjectPath))().assertEqual("o");
   typeSig!(Variant!int)().assertEqual("v");
   // enums
   enum E : ubyte {

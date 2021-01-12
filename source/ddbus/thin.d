@@ -46,6 +46,10 @@ struct ObjectPath {
     return hashOf(_value);
   }
 
+  T opCast(T : ObjectPath)() const pure @nogc nothrow @safe {
+    return this;
+  }
+
   T opCast(T : string)() const pure @nogc nothrow @safe {
     return value;
   }
@@ -482,25 +486,26 @@ struct DBusAny {
       TypeMismatchException if the DBus type of the current value of the
       DBusAny object is not the same as the DBus type used to represent T.
   +/
-  T get(T)() @property const
-      if (staticIndexOf!(T, BasicTypes) >= 0) {
+  U get(U)() @property const
+      if (staticIndexOf!(Unqual!U, BasicTypes) >= 0) {
+    alias T = Unqual!U;
     enforce(type == typeCode!T, new TypeMismatchException(
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ typeSig ~ "'.",
         typeCode!T, type));
 
     static if (isIntegral!T) {
       enum memberName = (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
-      return __traits(getMember, this, memberName);
+      return cast(U) __traits(getMember, this, memberName);
     } else static if (is(T == double)) {
-      return float64;
+      return cast(U) float64;
     } else static if (is(T == string)) {
-      return str;
+      return cast(U) str;
     } else static if (is(T == InterfaceName) || is(T == BusName)) {
-      return cast(T) str;
+      return cast(U) str;
     } else static if (is(T == ObjectPath)) {
-      return obj;
+      return cast(U) obj;
     } else static if (is(T == bool)) {
-      return boolean;
+      return cast(U) boolean;
     } else {
       static assert(false);
     }
@@ -696,6 +701,21 @@ struct DBusAny {
       return uint64 == b.uint64;
     }
   }
+
+  /// Returns: true if this variant is an integer.
+  bool typeIsIntegral() const @property {
+    return type.dbusIsIntegral;
+  }
+
+  /// Returns: true if this variant is a floating point value.
+  bool typeIsFloating() const @property {
+    return type.dbusIsFloating;
+  }
+
+  /// Returns: true if this variant is an integer or a floating point value.
+  bool typeIsNumeric() const @property {
+    return type.dbusIsNumeric;
+  }
 }
 
 unittest {
@@ -706,23 +726,26 @@ unittest {
     return v;
   }
 
-  void test(T)(T value, DBusAny b) {
+  void test(bool testGet = false, T)(T value, DBusAny b) {
     assertEqual(DBusAny(value), b);
     assertEqual(b.to!T, value);
+    static if (testGet)
+      assertEqual(b.get!T, value);
     b.toString();
   }
 
-  test(cast(ubyte) 184, set!"uint8"(DBusAny('y', null, false), cast(ubyte) 184));
-  test(cast(short) 184, set!"int16"(DBusAny('n', null, false), cast(short) 184));
-  test(cast(ushort) 184, set!"uint16"(DBusAny('q', null, false), cast(ushort) 184));
-  test(cast(int) 184, set!"int32"(DBusAny('i', null, false), cast(int) 184));
-  test(cast(uint) 184, set!"uint32"(DBusAny('u', null, false), cast(uint) 184));
-  test(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
-  test(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
-  test(1.84, set!"float64"(DBusAny('d', null, false), 1.84));
-  test(true, set!"boolean"(DBusAny('b', null, false), true));
-  test("abc", set!"str"(DBusAny('s', null, false), "abc"));
-  test(ObjectPath("/foo/Bar"), set!"obj"(DBusAny('o', null, false), ObjectPath("/foo/Bar")));
+  test!true(cast(ubyte) 184, set!"uint8"(DBusAny('y', null, false), cast(ubyte) 184));
+  test(cast(byte) 184, set!"uint8"(DBusAny('y', null, false), cast(byte) 184));
+  test!true(cast(short) 184, set!"int16"(DBusAny('n', null, false), cast(short) 184));
+  test!true(cast(ushort) 184, set!"uint16"(DBusAny('q', null, false), cast(ushort) 184));
+  test!true(cast(int) 184, set!"int32"(DBusAny('i', null, false), cast(int) 184));
+  test!true(cast(uint) 184, set!"uint32"(DBusAny('u', null, false), cast(uint) 184));
+  test!true(cast(long) 184, set!"int64"(DBusAny('x', null, false), cast(long) 184));
+  test!true(cast(ulong) 184, set!"uint64"(DBusAny('t', null, false), cast(ulong) 184));
+  test!true(1.84, set!"float64"(DBusAny('d', null, false), 1.84));
+  test!true(true, set!"boolean"(DBusAny('b', null, false), true));
+  test!true("abc", set!"str"(DBusAny('s', null, false), "abc"));
+  test!true(ObjectPath("/foo/Bar"), set!"obj"(DBusAny('o', null, false), ObjectPath("/foo/Bar")));
   test(cast(ubyte[])[1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false),
       cast(ubyte[])[1, 2, 3]));
 
