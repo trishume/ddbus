@@ -450,7 +450,7 @@ unittest {
     z = 4
   }
 
-  alias V = Algebraic!(byte, short, int, long, string);
+  alias V = Algebraic!(ubyte, short, int, long, string);
 
   Message msg = Message(busName("org.example.wow"), ObjectPath("/wut"), interfaceName("org.test.iface"), "meth2");
   V v1 = "hello from variant";

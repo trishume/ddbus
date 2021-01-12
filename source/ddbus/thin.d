@@ -222,7 +222,7 @@ struct DBusAny {
 
   union {
     ///
-    byte int8;
+    ubyte uint8;
     ///
     short int16;
     ///
@@ -273,8 +273,8 @@ struct DBusAny {
    +/
   this(T)(T value) {
     static if (is(T == byte) || is(T == ubyte)) {
-      this(typeCode!byte, null, false);
-      int8 = cast(byte) value;
+      this(typeCode!ubyte, null, false);
+      uint8 = cast(ubyte) value;
     } else static if (is(T == short)) {
       this(typeCode!short, null, false);
       int16 = cast(short) value;
@@ -410,8 +410,8 @@ struct DBusAny {
   string toString() const {
     string valueStr;
     switch (type) {
-    case typeCode!byte:
-      valueStr = int8.to!string;
+    case typeCode!ubyte:
+      valueStr = uint8.to!string;
       break;
     case typeCode!short:
       valueStr = int16.to!string;
@@ -712,7 +712,7 @@ unittest {
     b.toString();
   }
 
-  test(cast(ubyte) 184, set!"int8"(DBusAny('y', null, false), cast(byte) 184));
+  test(cast(ubyte) 184, set!"uint8"(DBusAny('y', null, false), cast(ubyte) 184));
   test(cast(short) 184, set!"int16"(DBusAny('n', null, false), cast(short) 184));
   test(cast(ushort) 184, set!"uint16"(DBusAny('q', null, false), cast(ushort) 184));
   test(cast(int) 184, set!"int32"(DBusAny('i', null, false), cast(int) 184));
@@ -726,7 +726,7 @@ unittest {
   test(cast(ubyte[])[1, 2, 3], set!"binaryData"(DBusAny('a', ['y'], false),
       cast(ubyte[])[1, 2, 3]));
 
-  test(variant(cast(ubyte) 184), set!"int8"(DBusAny('y', null, true), cast(byte) 184));
+  test(variant(cast(ubyte) 184), set!"uint8"(DBusAny('y', null, true), cast(ubyte) 184));
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
   test(variant(cast(ushort) 184), set!"uint16"(DBusAny('q', null, true), cast(ushort) 184));
   test(variant(cast(int) 184), set!"int32"(DBusAny('i', null, true), cast(int) 184));

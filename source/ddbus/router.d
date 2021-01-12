@@ -275,7 +275,7 @@ unittest {
   }
 
   struct S {
-    byte b;
+    ubyte b;
     ulong ul;
     F f;
   }

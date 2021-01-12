@@ -54,7 +54,7 @@ template allCanDBus(TS...) {
   AliasSeq of all basic types in terms of the DBus typesystem
  +/
 package  // Don't add to the API yet, 'cause I intend to move it later
-alias BasicTypes = AliasSeq!(bool, byte, short, ushort, int, uint, long, ulong,
+alias BasicTypes = AliasSeq!(bool, ubyte, short, ushort, int, uint, long, ulong,
     double, string, ObjectPath, InterfaceName, BusName);
 
 template basicDBus(T) {
@@ -108,7 +108,7 @@ unittest {
 
 string typeSig(T)()
     if (canDBus!T) {
-  static if (is(T == byte)) {
+  static if (is(T == ubyte)) {
     return "y";
   } else static if (is(T == bool)) {
     return "b";
@@ -218,13 +218,13 @@ unittest {
   typeSig!string().assertEqual("s");
   typeSig!(Variant!int)().assertEqual("v");
   // enums
-  enum E : byte {
+  enum E : ubyte {
     a,
     b,
     c
   }
 
-  typeSig!E().assertEqual(typeSig!byte());
+  typeSig!E().assertEqual(typeSig!ubyte());
   enum U : string {
     One = "One",
     Two = "Two"
@@ -262,7 +262,7 @@ unittest {
   // arrays
   typeSig!(int[]).assertEqual("ai");
   typeSig!(Variant!int[]).assertEqual("av");
-  typeSig!(Tuple!(byte)[][]).assertEqual("aa(y)");
+  typeSig!(Tuple!(ubyte)[][]).assertEqual("aa(y)");
   // dictionaries
   typeSig!(int[string]).assertEqual("a{si}");
   typeSig!(DictionaryEntry!(string, int)[]).assertEqual("a{si}");
