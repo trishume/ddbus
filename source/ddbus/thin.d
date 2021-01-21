@@ -171,6 +171,17 @@ InterfaceName interfaceName(string path) pure @nogc nothrow @safe {
   return cast(InterfaceName) path;
 }
 
+/// Serving as a typesafe alias for a FileDescriptor.
+enum FileDescriptor : int {
+  none = -1,
+  max = int.max
+}
+
+/// Casts an integer to a FileDescriptor.
+FileDescriptor fileDescriptor(int fileNo) pure @nogc nothrow @safe {
+  return cast(FileDescriptor) fileNo;
+}
+
 unittest {
   import dunit.toolkit;
 
@@ -283,6 +294,9 @@ struct DBusAny {
       uint16 = cast(ushort) value;
     } else static if (is(T == int)) {
       this(typeCode!int, null, false);
+      int32 = cast(int) value;
+    } else static if (is(T == FileDescriptor)) {
+      this(typeCode!FileDescriptor, null, false);
       int32 = cast(int) value;
     } else static if (is(T == uint)) {
       this(typeCode!uint, null, false);
@@ -459,6 +473,9 @@ struct DBusAny {
     case 'e':
       valueStr = entry.key.toString ~ ": " ~ entry.value.toString;
       break;
+    case 'h':
+      valueStr = int32.to!string;
+      break;
     default:
       valueStr = "unknown";
       break;
@@ -488,7 +505,9 @@ struct DBusAny {
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ typeSig ~ "'.",
         typeCode!T, type));
 
-    static if (isIntegral!T) {
+    static if (is(T == FileDescriptor)) {
+      return fileDescriptor(int32);
+    } else  static if (isIntegral!T) {
       enum memberName = (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
       return __traits(getMember, this, memberName);
     } else static if (is(T == double)) {
@@ -730,6 +749,7 @@ unittest {
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
   test(variant(cast(ushort) 184), set!"uint16"(DBusAny('q', null, true), cast(ushort) 184));
   test(variant(cast(int) 184), set!"int32"(DBusAny('i', null, true), cast(int) 184));
+  test(variant(cast(FileDescriptor) 184), set!"int32"(DBusAny('h', null, true), cast(FileDescriptor) 184));
   test(variant(cast(uint) 184), set!"uint32"(DBusAny('u', null, true), cast(uint) 184));
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));

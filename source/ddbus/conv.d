@@ -172,7 +172,7 @@ void buildIter(TS...)(DBusMessageIter* iter, TS args)
 }
 
 T readIter(T)(DBusMessageIter* iter)
-    if (is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) {
+    if (is(T == enum) && !is(T == InterfaceName) && !is(T == BusName) && !is(T == FileDescriptor)) {
   import std.algorithm.searching : canFind;
 
   alias OriginalType!T B;
@@ -198,7 +198,8 @@ T readIter(T)(DBusMessageIter* iter)
 }
 
 T readIter(T)(DBusMessageIter* iter)
-    if (!(is(T == enum) && !is(T == InterfaceName) && !is(T == BusName)) && !isInstanceOf!(BitFlags, T) && canDBus!T) {
+    if (!(is(T == enum) && !is(T == InterfaceName) && !is(T == BusName) && !is(T == FileDescriptor))
+    && !isInstanceOf!(BitFlags, T) && canDBus!T) {
   auto argType = dbus_message_iter_get_arg_type(iter);
   T ret;
 

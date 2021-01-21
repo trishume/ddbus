@@ -55,7 +55,7 @@ template allCanDBus(TS...) {
  +/
 package  // Don't add to the API yet, 'cause I intend to move it later
 alias BasicTypes = AliasSeq!(bool, byte, short, ushort, int, uint, long, ulong,
-    double, string, ObjectPath, InterfaceName, BusName);
+    double, string, ObjectPath, InterfaceName, BusName, FileDescriptor);
 
 template basicDBus(T) {
   static if (staticIndexOf!(T, BasicTypes) >= 0) {
@@ -104,6 +104,7 @@ unittest {
   (canDBus!(Tuple!(int[], bool, Variant!short))).assertTrue();
   (canDBus!(Tuple!(int[], int[string]))).assertTrue();
   (canDBus!(int[string])).assertTrue();
+  (canDBus!FileDescriptor).assertTrue();
 }
 
 string typeSig(T)()
@@ -116,6 +117,8 @@ string typeSig(T)()
     return "n";
   } else static if (is(T == ushort)) {
     return "q";
+  } else static if (is(T == FileDescriptor)) {
+    return "h";
   } else static if (is(T == int)) {
     return "i";
   } else static if (is(T == uint)) {
@@ -217,6 +220,7 @@ unittest {
   typeSig!bool().assertEqual("b");
   typeSig!string().assertEqual("s");
   typeSig!(Variant!int)().assertEqual("v");
+  typeSig!FileDescriptor().assertEqual("h");
   // enums
   enum E : byte {
     a,
@@ -256,9 +260,10 @@ unittest {
     string d;
     S1 e;
     uint f;
+    FileDescriptor g;
   }
 
-  typeSig!S2.assertEqual("(vs(ids)u)");
+  typeSig!S2.assertEqual("(vs(ids)uh)");
   // arrays
   typeSig!(int[]).assertEqual("ai");
   typeSig!(Variant!int[]).assertEqual("av");
