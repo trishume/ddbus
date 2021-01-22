@@ -150,6 +150,14 @@ class MessageRouter {
     callTable[patt] = handleStruct;
   }
 
+  unittest {
+    auto router = new MessageRouter;
+    auto patt = MessagePattern(ObjectPath("/org/myorg/service"), interfaceName("org.myorg.service"), "", false);
+    router.setHandler(patt, (string arg) {
+      return arg.length;
+    });
+  }
+
   static string introspectHeader = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="%s">`;
 
