@@ -177,8 +177,10 @@ InterfaceName interfaceName(string path) pure @nogc nothrow @safe {
 
 /// Serving as a typesafe alias for a FileDescriptor.
 enum FileDescriptor : int {
-  none = -1,
-  max = int.max
+  none   = -1,
+  stdin  = 0,
+  stdout = 1,
+  stderr = 2
 }
 
 /// Casts an integer to a FileDescriptor.
@@ -266,6 +268,7 @@ struct DBusAny {
     DictionaryEntry!(DBusAny, DBusAny)* entry;
     ///
     ubyte[] binaryData;
+    FileDescriptor fd;
   }
 
   /++
@@ -301,7 +304,7 @@ struct DBusAny {
       int32 = cast(int) value;
     } else static if (is(T == FileDescriptor)) {
       this(typeCode!FileDescriptor, null, false);
-      int32 = cast(int) value;
+      fd = cast(FileDescriptor) value;
     } else static if (is(T == uint)) {
       this(typeCode!uint, null, false);
       uint32 = cast(uint) value;
@@ -511,7 +514,7 @@ struct DBusAny {
         typeCode!T, type));
 
     static if (is(T == FileDescriptor)) {
-      return fileDescriptor(int32);
+      return cast(U) fd;
     } else  static if (isIntegral!T) {
       enum memberName = (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
       return cast(U) __traits(getMember, this, memberName);
