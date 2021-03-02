@@ -15,6 +15,7 @@ ddbus_lib = library(
     'ddbus',
     lib_src,
     version: meson.project_version(),
+    dependencies: [dbus_dep],
     install: true,
     include_directories: src_inc,
 )
