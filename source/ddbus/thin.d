@@ -268,6 +268,7 @@ struct DBusAny {
     DictionaryEntry!(DBusAny, DBusAny)* entry;
     ///
     ubyte[] binaryData;
+    ///
     FileDescriptor fd;
   }
 
