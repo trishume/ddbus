@@ -176,15 +176,15 @@ InterfaceName interfaceName(string path) pure @nogc nothrow @safe {
 }
 
 /// Serving as a typesafe alias for a FileDescriptor.
-enum FileDescriptor : int {
-  none   = -1,
+enum FileDescriptor : uint {
+  none   = uint.max,
   stdin  = 0,
   stdout = 1,
   stderr = 2
 }
 
 /// Casts an integer to a FileDescriptor.
-FileDescriptor fileDescriptor(int fileNo) pure @nogc nothrow @safe {
+FileDescriptor fileDescriptor(uint fileNo) pure @nogc nothrow @safe {
   return cast(FileDescriptor) fileNo;
 }
 
@@ -776,7 +776,8 @@ unittest {
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
   test(variant(cast(ushort) 184), set!"uint16"(DBusAny('q', null, true), cast(ushort) 184));
   test(variant(cast(int) 184), set!"int32"(DBusAny('i', null, true), cast(int) 184));
-  test(variant(cast(FileDescriptor) 184), set!"int32"(DBusAny('h', null, true), cast(FileDescriptor) 184));
+  test(variant(cast(FileDescriptor) 184), set!"uint32"(DBusAny('h', null, true), cast(FileDescriptor) 184));
+  test(variant(cast(FileDescriptor) FileDescriptor.none), set!"uint32"(DBusAny('h', null, true), cast(FileDescriptor) FileDescriptor.none));
   test(variant(cast(uint) 184), set!"uint32"(DBusAny('u', null, true), cast(uint) 184));
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
