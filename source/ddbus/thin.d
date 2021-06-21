@@ -175,6 +175,19 @@ InterfaceName interfaceName(string path) pure @nogc nothrow @safe {
   return cast(InterfaceName) path;
 }
 
+/// Serving as a typesafe alias for a FileDescriptor.
+enum FileDescriptor : uint {
+  none   = uint.max,
+  stdin  = 0,
+  stdout = 1,
+  stderr = 2
+}
+
+/// Casts an integer to a FileDescriptor.
+FileDescriptor fileDescriptor(uint fileNo) pure @nogc nothrow @safe {
+  return cast(FileDescriptor) fileNo;
+}
+
 unittest {
   import dunit.toolkit;
 
@@ -255,6 +268,8 @@ struct DBusAny {
     DictionaryEntry!(DBusAny, DBusAny)* entry;
     ///
     ubyte[] binaryData;
+    ///
+    FileDescriptor fd;
   }
 
   /++
@@ -288,6 +303,9 @@ struct DBusAny {
     } else static if (is(T == int)) {
       this(typeCode!int, null, false);
       int32 = cast(int) value;
+    } else static if (is(T == FileDescriptor)) {
+      this(typeCode!FileDescriptor, null, false);
+      fd = cast(FileDescriptor) value;
     } else static if (is(T == uint)) {
       this(typeCode!uint, null, false);
       uint32 = cast(uint) value;
@@ -463,6 +481,9 @@ struct DBusAny {
     case 'e':
       valueStr = entry.key.toString ~ ": " ~ entry.value.toString;
       break;
+    case 'h':
+      valueStr = int32.to!string;
+      break;
     default:
       valueStr = "unknown";
       break;
@@ -493,7 +514,9 @@ struct DBusAny {
         "Cannot get a " ~ T.stringof ~ " from a DBusAny with" ~ " a value of DBus type '" ~ typeSig ~ "'.",
         typeCode!T, type));
 
-    static if (isIntegral!T) {
+    static if (is(T == FileDescriptor)) {
+      return cast(U) fd;
+    } else  static if (isIntegral!T) {
       enum memberName = (isUnsigned!T ? "uint" : "int") ~ (T.sizeof * 8).to!string;
       return cast(U) __traits(getMember, this, memberName);
     } else static if (is(T == double)) {
@@ -753,6 +776,8 @@ unittest {
   test(variant(cast(short) 184), set!"int16"(DBusAny('n', null, true), cast(short) 184));
   test(variant(cast(ushort) 184), set!"uint16"(DBusAny('q', null, true), cast(ushort) 184));
   test(variant(cast(int) 184), set!"int32"(DBusAny('i', null, true), cast(int) 184));
+  test(variant(cast(FileDescriptor) 184), set!"uint32"(DBusAny('h', null, true), cast(FileDescriptor) 184));
+  test(variant(cast(FileDescriptor) FileDescriptor.none), set!"uint32"(DBusAny('h', null, true), cast(FileDescriptor) FileDescriptor.none));
   test(variant(cast(uint) 184), set!"uint32"(DBusAny('u', null, true), cast(uint) 184));
   test(variant(cast(long) 184), set!"int64"(DBusAny('x', null, true), cast(long) 184));
   test(variant(cast(ulong) 184), set!"uint64"(DBusAny('t', null, true), cast(ulong) 184));
