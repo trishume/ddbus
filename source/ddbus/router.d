@@ -105,20 +105,27 @@ class MessageRouter {
 
   void setHandler(Ret, Args...)(MessagePattern patt, Ret delegate(Args) handler) {
     void handlerWrapper(Message call, Connection conn) {
+      import ddbus.exception : DBusErrorReturn;
       Tuple!Args args = call.readTuple!(Tuple!Args)();
-      auto retMsg = call.createReturn();
 
-      static if (!is(Ret == void)) {
-        Ret ret = handler(args.expand);
-        static if (is(Ret == Tuple!T, T...)) {
-          retMsg.build!T(ret.expand);
+      Message retMsg;
+      try {
+        retMsg = call.createReturn();
+
+        static if (!is(Ret == void)) {
+          Ret ret = handler(args.expand);
+          static if (is(Ret == Tuple!T, T...)) {
+            retMsg.build!T(ret.expand);
+          } else {
+            retMsg.build(ret);
+          }
         } else {
-          retMsg.build(ret);
+          handler(args.expand);
         }
-      } else {
-        handler(args.expand);
+      } catch(DBusErrorReturn e) {
+        retMsg = Message(dbus_message_new_error(call.msg,
+            e.errorName.toStringz, e.msg.toStringz));
       }
-
       if (!patt.signal) {
         conn.send(retMsg);
       }
@@ -141,6 +148,14 @@ class MessageRouter {
     // dfmt on
 
     callTable[patt] = handleStruct;
+  }
+
+  unittest {
+    auto router = new MessageRouter;
+    auto patt = MessagePattern(ObjectPath("/org/myorg/service"), interfaceName("org.myorg.service"), "", false);
+    router.setHandler(patt, (string arg) {
+      return arg.length;
+    });
   }
 
   static string introspectHeader = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
