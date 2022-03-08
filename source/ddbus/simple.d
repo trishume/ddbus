@@ -33,6 +33,13 @@ class PathIface {
     return ret.read!Ret();
   }
 
+  void call(Ret, Args...)(string meth, Args args)
+      if (allCanDBus!Args && is(Ret == void)) {
+    Message msg = Message(dbus_message_new_method_call(dest, path, iface, meth.toStringz()));
+    msg.build(args);
+    conn.sendBlocking(msg);
+  }
+
   Message opDispatch(string meth, Args...)(Args args) {
     Message msg = Message(dbus_message_new_method_call(dest, path, iface, meth.toStringz()));
     msg.build(args);
